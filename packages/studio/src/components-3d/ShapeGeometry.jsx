@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, forwardRef } from "react";
 import { lighten, darken, complement } from "polished";
 import { Plane } from "three";
 
@@ -22,7 +22,7 @@ const colorVariants = (baseColor = "#5a8296") => {
   };
 };
 
-const ShapeGeometry = ({
+const ShapeGeometry = forwardRef(({
   shape,
   onFaceClick,
   onEdgeClick,
@@ -32,7 +32,7 @@ const ShapeGeometry = ({
   FaceMaterial = "meshBasicMaterial",
   clipDirection = null,
   clipConstant = 0,
-}) => {
+}, ref) => {
   const fOnClick = useWrappedFaceEvent(onFaceClick);
   const eOnClick = useWrappedEdgeEvent(onEdgeClick);
 
@@ -67,6 +67,7 @@ const ShapeGeometry = ({
       <ClipPlane sideColor={colors.sideColor} clippingPlane={clippingPlane}>
         {FaceMaterial && (
           <ReplicadFacesMesh
+            ref={ref}
             faces={shape.mesh}
             defaultHighlight={shape.highlight}
             highlight={facesHighlight}
@@ -116,7 +117,9 @@ const ShapeGeometry = ({
       </ClipPlane>
     </>
   );
-};
+});
+
+ShapeGeometry.displayName = 'ShapeGeometry';
 
 export default ShapeGeometry;
 

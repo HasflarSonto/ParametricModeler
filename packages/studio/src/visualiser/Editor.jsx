@@ -207,6 +207,25 @@ const EditorView = observer(function Editor() {
               <Configure />
             </Button>
           )}
+          
+          <Button
+            solid={store.ui.showGumball}
+            small
+            onClick={() => store.ui.toggleGumball()}
+          >
+            🎯
+          </Button>
+          
+          {store.ui.showGumball && (
+            <Select
+              value={store.ui.gumballMode}
+              onChange={(e) => store.ui.setGumballMode(e.target.value)}
+            >
+              <option value="translate">Move</option>
+              <option value="rotate">Rotate</option>
+              <option value="scale">Scale</option>
+            </Select>
+          )}
         </ButtonBar>
       </Toolbar>
       {(!store.ui.clip.disabled ||

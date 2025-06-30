@@ -45,6 +45,8 @@ export default types.optional(
       clip: ClipConfig,
       showDownload: types.optional(types.boolean, false),
       enableParams: types.optional(types.boolean, false),
+      showGumball: types.optional(types.boolean, false),
+      gumballMode: types.optional(types.enumeration(['translate', 'rotate', 'scale']), 'translate'),
     })
     .views((self) => ({
       get singleShape() {
@@ -93,6 +95,18 @@ export default types.optional(
         selectShape(newSelection) {
           self.shapeSelection = newSelection;
           self.deHighlight();
+        },
+        toggleGumball() {
+          self.showGumball = !self.showGumball;
+        },
+        setGumballMode(mode) {
+          self.gumballMode = mode;
+        },
+        showGumballForSelection() {
+          self.showGumball = true;
+        },
+        hideGumball() {
+          self.showGumball = false;
         },
       };
     }),

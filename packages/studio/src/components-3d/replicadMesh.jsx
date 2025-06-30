@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useEffect } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useEffect, forwardRef } from "react";
 import { BufferGeometry } from "three";
 import { useThree } from "@react-three/fiber";
 import {
@@ -62,8 +62,10 @@ export const useFaceGeometry = (faces, highlight) => {
 
   useEffect(
     () => () => {
-      body.current.dispose();
-      invalidate();
+      if (body.current) {
+        body.current.dispose();
+        invalidate();
+      }
     },
     [invalidate]
   );
@@ -77,14 +79,17 @@ export const useLinesGeometry = (edges, highlight) => {
   const lines = useRef(new BufferGeometry());
 
   useLayoutEffect(() => {
+    if (!edges) return;
     syncLines(lines.current, edges, highlight);
     invalidate();
   }, [edges, highlight, invalidate]);
 
   useEffect(
     () => () => {
-      lines.current.dispose();
-      invalidate();
+      if (lines.current) {
+        lines.current.dispose();
+        invalidate();
+      }
     },
     [invalidate]
   );
@@ -92,22 +97,24 @@ export const useLinesGeometry = (edges, highlight) => {
   return lines.current;
 };
 
-export const ReplicadFacesMesh = ({
+export const ReplicadFacesMesh = forwardRef(({
   faces,
   defaultHighlight,
   highlight,
   children,
   ...props
-}) => {
+}, ref) => {
   const faceGeometry = useFaceGeometry(faces, defaultHighlight);
   useApplyHighlights(faceGeometry, highlight);
   return (
-    <mesh {...props}>
+    <mesh ref={ref} {...props}>
       <primitive object={faceGeometry} attach="geometry" />
       {children}
     </mesh>
   );
-};
+});
+
+ReplicadFacesMesh.displayName = 'ReplicadFacesMesh';
 
 export const ReplicadEdgesMesh = ({
   edges,
