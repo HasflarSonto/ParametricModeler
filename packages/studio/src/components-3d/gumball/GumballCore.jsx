@@ -50,21 +50,22 @@ const GumballCore = ({
   }, [selectedShape, shapeKeyRef.current]);
 
   // Continuously update TransformControls to follow the object
-  useFrame(() => {
-    if (controlsRef.current && selectedShape && !isDraggingRef.current) {
-      const controls = controlsRef.current;
-      const object = selectedShape;
-      
-      // Check if the controls are at the wrong position
-      if (object.position && controls.object) {
-        const distance = controls.object.position.distanceTo(object.position);
-        if (distance > 0.1) {
-          controls.reset();
-          console.log('TransformControls repositioned to follow object');
-        }
-      }
-    }
-  });
+  // COMMENTED OUT: This was preventing visual movement during drag
+  // useFrame(() => {
+  //   if (controlsRef.current && selectedShape && !isDraggingRef.current) {
+  //     const controls = controlsRef.current;
+  //     const object = selectedShape;
+  //     
+  //     // Check if the controls are at the wrong position
+  //     if (object.position && controls.object) {
+  //       const distance = controls.object.position.distanceTo(object.position);
+  //       if (distance > 0.1) {
+  //         controls.reset();
+  //         console.log('TransformControls repositioned to follow object');
+  //       }
+  //     }
+  //   }
+  // });
 
   const handleMouseDown = () => {
     if (!selectedShape) return;
@@ -140,9 +141,15 @@ const GumballCore = ({
               axis = [0, 0, 1];
               angle = individualAngleZ;
             }
+            // Use the gumball's position as the center of rotation
+            const center = [
+              current.position.x,
+              current.position.y,
+              current.position.z
+            ];
             transformData = {
               type: 'rotate',
-              values: [angle, [0, 0, 0], axis]
+              values: [angle, center, axis]
             };
           }
         }

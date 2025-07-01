@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import debounce from "debounce";
 import styled from "styled-components";
 import { observer } from "mobx-react";
@@ -68,8 +68,11 @@ const RightAligned = styled.div`
 
 export default observer(function EditorPane() {
   const store = useEditorStore();
+  const editorRef = useRef(null);
+  const isExternalUpdateRef = useRef(false);
 
-  const handleEditorDidMount = (_, monaco) => {
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
     monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
     monaco.languages.typescript.javascriptDefaults.setExtraLibs([
       {
@@ -86,6 +89,28 @@ export default observer(function EditorPane() {
     ]);
   };
 
+  // Listen for external code updates (from gumball)
+  useEffect(() => {
+    const handleCodeUpdate = (event) => {
+      if (event.detail?.source === 'gumball' && editorRef.current) {
+        isExternalUpdateRef.current = true;
+        const model = editorRef.current.getModel();
+        if (model) {
+          model.setValue(event.detail.code);
+        }
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          isExternalUpdateRef.current = false;
+        }, 100);
+      }
+    };
+
+    window.addEventListener('codeUpdated', handleCodeUpdate);
+    return () => {
+      window.removeEventListener('codeUpdated', handleCodeUpdate);
+    };
+  }, []);
+
   if (!store.code.initialized) return <LoadingScreen />;
 
   return (
@@ -98,11 +123,14 @@ export default observer(function EditorPane() {
       >
         <Editor
           defaultLanguage="javascript"
-          defaultValue={store.code.current}
+          value={store.code.current}
           theme="vs-dark"
           height="100%"
           onChange={debounce((e) => {
-            store.code.update(e, true);
+            // Only update if this is not an external update
+            if (!isExternalUpdateRef.current) {
+              store.code.update(e, true);
+            }
           }, 300)}
           onMount={handleEditorDidMount}
           options={{

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CodeAnalyzer } from './CodeAnalyzer.js';
 
 /**
  * MeshSelector handles the complex mesh reference management and selection logic
@@ -17,6 +18,12 @@ export class MeshSelector {
     // Track mesh by unique identifiers
     this.meshIdentifier = null;
     this.meshVersion = 0;
+
+    // Code context tracking for selection-aware modifications
+    this.selectedObjectName = null;        // Variable name in code (e.g., "vase", "wateringCan")
+    this.selectedObjectPath = null;        // Path to object in code (e.g., "shape" in return {shape: wateringCan})
+    this.codeContext = null;               // Full code context for analysis
+    this.codeAnalyzer = new CodeAnalyzer(); // Code analysis instance
   }
 
   /**
@@ -271,6 +278,7 @@ export class MeshSelector {
     this.lastShapeGeometryRef = null;
     this.meshIdentifier = null;
     this.meshVersion = 0;
+    this.resetCodeContext();
     console.log('MeshSelector: Reset all references');
   }
 
@@ -282,5 +290,98 @@ export class MeshSelector {
       this.gumballPositionRef.parent.remove(this.gumballPositionRef);
       this.gumballPositionRef = null;
     }
+  }
+
+  /**
+   * Update code context when selection changes
+   */
+  updateCodeContext(code, shapeGeometryRef, faceSelected, edgeSelected) {
+    console.log('=== Updating code context ===');
+    console.log('Code length:', code.length);
+    console.log('shapeGeometryRef:', shapeGeometryRef);
+    console.log('faceSelected:', faceSelected);
+    console.log('edgeSelected:', edgeSelected);
+
+    try {
+      // Analyze the code to understand its structure
+      const analysis = this.codeAnalyzer.analyzeCode(code);
+      this.codeContext = analysis;
+      
+      console.log('Code analysis:', analysis);
+      
+      // Debug: Show the actual return statement
+      if (analysis.returnStatements && analysis.returnStatements.length > 0) {
+        console.log('📋 Found return statement:', analysis.returnStatements[0].value);
+        console.log('📋 Return type:', analysis.returnStatements[0].type);
+        console.log('📋 Return details:', analysis.returnStatements[0].details);
+      }
+      
+      // Determine which object corresponds to the selection
+      this.selectedObjectName = this.codeAnalyzer.determineSelectedObject(
+        analysis, 
+        shapeGeometryRef, 
+        faceSelected, 
+        edgeSelected
+      );
+      
+      // Determine the object path in complex return statements
+      this.selectedObjectPath = this.codeAnalyzer.determineObjectPath(
+        analysis, 
+        this.selectedObjectName
+      );
+      
+      console.log('🎯 SELECTED OBJECT IDENTIFICATION:');
+      console.log('  Object Name:', this.selectedObjectName);
+      console.log('  Object Path:', this.selectedObjectPath);
+      console.log('  Has Valid Selection:', this.hasValidSelection());
+      console.log('  Has Valid Code Context:', this.hasValidCodeContext());
+      
+      if (this.selectedObjectName) {
+        console.log('✅ Successfully identified object for selection:', this.selectedObjectName);
+        if (this.selectedObjectPath) {
+          console.log('📁 Object is in complex return statement with path:', this.selectedObjectPath);
+        } else {
+          console.log('📄 Object is in simple return statement');
+        }
+      } else {
+        console.log('❌ Could not identify object for selection');
+      }
+      
+    } catch (error) {
+      console.error('Error updating code context:', error);
+      this.selectedObjectName = null;
+      this.selectedObjectPath = null;
+      this.codeContext = null;
+    }
+  }
+
+  /**
+   * Get the current selection context for code modification
+   */
+  getSelectionContext() {
+    return {
+      selectedObjectName: this.selectedObjectName,
+      selectedObjectPath: this.selectedObjectPath,
+      codeContext: this.codeContext,
+      hasValidSelection: this.hasValidSelection(),
+      meshIdentifier: this.meshIdentifier
+    };
+  }
+
+  /**
+   * Check if we have valid code context for modification
+   */
+  hasValidCodeContext() {
+    return this.selectedObjectName !== null && this.codeContext !== null;
+  }
+
+  /**
+   * Reset code context
+   */
+  resetCodeContext() {
+    this.selectedObjectName = null;
+    this.selectedObjectPath = null;
+    this.codeContext = null;
+    console.log('MeshSelector: Reset code context');
   }
 } 

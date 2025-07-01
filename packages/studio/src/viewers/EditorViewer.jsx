@@ -15,6 +15,8 @@ import Gumball from "../components-3d/gumball/Gumball.jsx";
 
 import SVGViewer from "./SVGViewer.jsx";
 import useEditorStore from "../visualiser/editor/useEditorStore";
+import { Button } from '../components/Button.jsx';
+import styled from 'styled-components';
 
 // Updated selection state to use persistent IDs
 const useSelection = () => {
@@ -151,6 +153,35 @@ function computeEdgeGroupCenter(edges, group) {
   return sum.multiplyScalar(1 / count);
 }
 
+const ModeSwitcherBar = styled.div`
+  position: absolute;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.95);
+  border-radius: 1.5em;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+  padding: 0.5em 1.5em;
+  display: flex;
+  align-items: center;
+  z-index: 100;
+  gap: 1em;
+`;
+
+const ModeSelect = styled.select`
+  background: transparent;
+  color: #fff;
+  border: none;
+  font-size: 1em;
+  outline: none;
+  margin-left: 0.5em;
+  margin-right: 0.5em;
+  option {
+    color: #222;
+    background: #fff;
+  }
+`;
+
 export default observer(function EditorViewer({
   shape,
   hasError,
@@ -260,8 +291,8 @@ export default observer(function EditorViewer({
     }
   }, [faceSelected, edgeSelected, store.ui]);
 
-  // Compute a dummy Object3D at the mesh's visual center
-  const gumballTarget = useMemo(() => {
+  // Compute a dummy Object3D at the mesh's origin in world space (proxy gumball)
+  const gumballProxy = useMemo(() => {
     if (!selectedMeshRef.current || !shape) return null;
     const mesh = selectedMeshRef.current;
     let center = null;
@@ -295,6 +326,31 @@ export default observer(function EditorViewer({
     return dummy;
   }, [selectedMeshRef.current, faceSelected, edgeSelected, shape]);
 
+  // Existing gumballTarget at mesh center
+  const gumballTarget = useMemo(() => {
+    if (!selectedMeshRef.current || !shape) return null;
+    const mesh = selectedMeshRef.current;
+    let position = new THREE.Vector3();
+    mesh.updateMatrixWorld();
+    position.setFromMatrixPosition(mesh.matrixWorld);
+    const dummy = new THREE.Object3D();
+    dummy.position.copy(position);
+    return dummy;
+  }, [selectedMeshRef.current, faceSelected, edgeSelected, shape]);
+
+  // Create context object for selection-aware code modification
+  const gumballContext = useMemo(() => {
+    if (!shape || !selectedMeshRef.current) return null;
+    
+    return {
+      code: store.code.current,
+      shape: shape,
+      meshRef: selectedMeshRef.current,
+      faceSelected: faceSelected,
+      edgeSelected: edgeSelected
+    };
+  }, [shape, selectedMeshRef.current, store.code.current, faceSelected, edgeSelected]);
+
   // Proxy transform events to the actual mesh
   const handleTransformStart = (initialTransform) => {
     if (!selectedMeshRef.current) return;
@@ -308,7 +364,23 @@ export default observer(function EditorViewer({
   };
 
   const handleTransformChange = () => {
-    // Optionally, you can update the mesh in real time if needed
+    console.log('EditorViewer: handleTransformChange called');
+    // Move the real mesh in real-time during drag
+    if (selectedMeshRef.current && gumballTarget) {
+      console.log('EditorViewer: Moving real mesh to match dummy position');
+      // Copy the position from the dummy to the real mesh
+      selectedMeshRef.current.position.copy(gumballTarget.position);
+      
+      // For rotation, also copy the rotation
+      if (store.ui.gumballMode === 'rotate') {
+        selectedMeshRef.current.rotation.copy(gumballTarget.rotation);
+      }
+      
+      // For scale, also copy the scale
+      if (store.ui.gumballMode === 'scale') {
+        selectedMeshRef.current.scale.copy(gumballTarget.scale);
+      }
+    }
   };
 
   const handleTransformEnd = (transformData) => {
@@ -348,53 +420,78 @@ export default observer(function EditorViewer({
   }
 
   return (
-    <Canvas
-      orthographic
-      onCreated={(state) => (state.gl.localClippingEnabled = true)}
-    >
-      <InfiniteGrid />
-
-      <Controls enableDamping={false}>
-        {hasError ? (
-          <DefaultGeometry />
-        ) : shape.length ? (
-          shape.map((s) => (
+    <>
+      <Canvas
+        orthographic
+        onCreated={(state) => (state.gl.localClippingEnabled = true)}
+      >
+        <InfiniteGrid />
+        <Controls enableDamping={false}>
+          {hasError ? (
+            <DefaultGeometry />
+          ) : shape.length ? (
+            shape.map((s) => (
+              <ShapeGeometry
+                key={s.name}
+                shape={s}
+                FaceMaterial={Material}
+                clipDirection={clipDirection}
+                clipConstant={clipConstant}
+              />
+            ))
+          ) : (
             <ShapeGeometry
-              key={s.name}
-              shape={s}
+              key={meshKey}
+              ref={handleMeshRef}
+              facesHighlight={facesHighlight}
+              edgesHighlight={edgesHighlight}
+              shape={shape}
               FaceMaterial={Material}
+              onEdgeClick={updateEdgeSelected}
+              onFaceClick={updateFaceSelected}
               clipDirection={clipDirection}
               clipConstant={clipConstant}
             />
-          ))
-        ) : (
-          <ShapeGeometry
-            key={meshKey}
-            ref={handleMeshRef}
-            facesHighlight={facesHighlight}
-            edgesHighlight={edgesHighlight}
-            shape={shape}
-            FaceMaterial={Material}
-            onEdgeClick={updateEdgeSelected}
-            onFaceClick={updateFaceSelected}
-            clipDirection={clipDirection}
-            clipConstant={clipConstant}
-          />
+          )}
+        </Controls>
+        {/* Add the dummy to the scene graph so TransformControls can attach to it */}
+        {gumballTarget && <primitive object={gumballTarget} />}
+        {gumballProxy && <primitive object={gumballProxy} />}
+        {/* Render gumball visually at mesh center, but functionally at mesh origin */}
+        {store.ui.showGumball && gumballTarget && gumballProxy && (
+          <group position={(() => {
+            // Ensure offset is in world space
+            const proxyWorld = gumballProxy.getWorldPosition(new THREE.Vector3());
+            const targetWorld = gumballTarget.getWorldPosition(new THREE.Vector3());
+            return proxyWorld.sub(targetWorld);
+          })()}>
+            <Gumball
+              selectedShape={gumballTarget}
+              mode={store.ui.gumballMode}
+              onTransformStart={handleTransformStart}
+              onTransformChange={handleTransformChange}
+              onTransformEnd={handleTransformEnd}
+              size={0.5}
+              context={gumballContext}
+            />
+          </group>
         )}
-      </Controls>
-      {/* Add the dummy to the scene graph so TransformControls can attach to it */}
-      {gumballTarget && <primitive object={gumballTarget} />}
-      {/* Render gumball at the mesh's visual center, but apply transforms to the real mesh */}
-      {store.ui.showGumball && gumballTarget && (
-        <Gumball
-          selectedShape={gumballTarget}
-          mode={store.ui.gumballMode}
-          onTransformStart={handleTransformStart}
-          onTransformChange={handleTransformChange}
-          onTransformEnd={handleTransformEnd}
-        />
+        <ClickOutsideDetector onClearSelection={clearSelection} hasSelection={faceSelected !== null || edgeSelected !== null} />
+      </Canvas>
+      {/* Mode switcher at the bottom center, only when gumball is visible */}
+      {store.ui.showGumball && (
+        <ModeSwitcherBar>
+          <span style={{ color: '#fff', fontWeight: 600, letterSpacing: '1px' }}>Gumball Mode:</span>
+          <ModeSelect
+            value={store.ui.gumballMode}
+            onChange={e => store.ui.setGumballMode(e.target.value)}
+          >
+            <option value="translate">Move</option>
+            <option value="rotate">Rotate</option>
+            <option value="scale">Scale</option>
+          </ModeSelect>
+        </ModeSwitcherBar>
       )}
-      <ClickOutsideDetector onClearSelection={clearSelection} hasSelection={faceSelected !== null || edgeSelected !== null} />
-    </Canvas>
+    </>
   );
 }); 

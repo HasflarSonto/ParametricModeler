@@ -10,12 +10,17 @@ import { MeshSelector } from './MeshSelector.js';
 const Gumball = ({ 
   selectedShape, 
   mode = 'translate',
-  size = 0.5 
+  size = 0.5,
+  onTransformStart,
+  onTransformChange,
+  onTransformEnd,
+  context = null
 }) => {
   const store = useEditorStore();
   const transformManagerRef = useRef(null);
   const meshSelectorRef = useRef(null);
   const lastSelectedShapeRef = useRef(null);
+  const lastContextRef = useRef(null);
   
   // Initialize managers
   useEffect(() => {
@@ -42,6 +47,34 @@ const Gumball = ({
       }
     }
   }, [selectedShape]);
+
+  // Handle code context synchronization
+  useEffect(() => {
+    if (context && context !== lastContextRef.current) {
+      console.log('=== Gumball: Context changed ===');
+      console.log('New context:', context);
+      
+      lastContextRef.current = context;
+      
+      // Update mesh selector with code context
+      if (meshSelectorRef.current && context.code) {
+        console.log('🔄 Updating mesh selector with code context...');
+        meshSelectorRef.current.updateCodeContext(
+          context.code,
+          selectedShape,
+          context.faceSelected || null,
+          context.edgeSelected || null
+        );
+        
+        // Pass selection context to transform manager
+        const selectionContext = meshSelectorRef.current.getSelectionContext();
+        if (transformManagerRef.current && selectionContext) {
+          console.log('🔄 Passing selection context to transform manager...');
+          transformManagerRef.current.setSelectionContext(selectionContext);
+        }
+      }
+    }
+  }, [context, selectedShape]);
 
   // Listen for parametric system updates and handle mesh recreation
   useEffect(() => {
@@ -83,7 +116,12 @@ const Gumball = ({
   // Handle transform events
   const handleTransformStart = (initialTransform) => {
     if (transformManagerRef.current) {
-      transformManagerRef.current.onTransformStart(initialTransform, selectedShape);
+      // Pass mesh selector for selection context
+      transformManagerRef.current.onTransformStart(initialTransform, selectedShape, meshSelectorRef.current);
+    }
+    // Call external handler if provided
+    if (onTransformStart) {
+      onTransformStart(initialTransform);
     }
   };
 
@@ -91,11 +129,19 @@ const Gumball = ({
     if (transformManagerRef.current) {
       transformManagerRef.current.onTransformChange();
     }
+    // Call external handler if provided
+    if (onTransformChange) {
+      onTransformChange();
+    }
   };
 
   const handleTransformEnd = (transformData) => {
     if (transformManagerRef.current) {
       transformManagerRef.current.onTransformEnd(transformData);
+    }
+    // Call external handler if provided
+    if (onTransformEnd) {
+      onTransformEnd(transformData);
     }
   };
 
