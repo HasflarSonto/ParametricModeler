@@ -7,6 +7,8 @@ import {
   syncFaces,
   getFaceIndex,
   getEdgeIndex,
+  getEdgeId,
+  getFaceId,
 } from "replicad-threejs-helper";
 
 export const useApplyHighlights = (geometry, highlight) => {
@@ -31,11 +33,20 @@ export const getFaceIndexFromEvent = (event) => {
   return getFaceIndex(event.faceIndex, event.object.geometry);
 };
 
+export const getEdgeIdFromEvent = (event) => {
+  return getEdgeId(event.index, event.object.geometry);
+};
+
+export const getFaceIdFromEvent = (event) => {
+  return getFaceId(event.faceIndex, event.object.geometry);
+};
+
 export const useWrappedEdgeEvent = (onEvent) => {
   return useMemo(() => {
     if (!onEvent) return null;
     return (e) => {
-      onEvent(e, getEdgeIndexFromEvent(e));
+      const edgeId = getEdgeIdFromEvent(e);
+      onEvent(e, edgeId);
     };
   }, [onEvent]);
 };
@@ -44,7 +55,8 @@ export const useWrappedFaceEvent = (onEvent) => {
   return useMemo(() => {
     if (!onEvent) return null;
     return (e) => {
-      onEvent(e, getFaceIndexFromEvent(e));
+      const faceId = getFaceIdFromEvent(e);
+      onEvent(e, faceId);
     };
   }, [onEvent]);
 };
