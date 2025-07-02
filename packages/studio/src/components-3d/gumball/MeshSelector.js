@@ -296,25 +296,12 @@ export class MeshSelector {
    * Update code context when selection changes
    */
   updateCodeContext(code, shapeGeometryRef, faceSelected, edgeSelected) {
-    console.log('=== Updating code context ===');
-    console.log('Code length:', code.length);
-    console.log('shapeGeometryRef:', shapeGeometryRef);
-    console.log('faceSelected:', faceSelected);
-    console.log('edgeSelected:', edgeSelected);
+    console.log('🔄 Updating code context...');
 
     try {
       // Analyze the code to understand its structure
       const analysis = this.codeAnalyzer.analyzeCode(code);
       this.codeContext = analysis;
-      
-      console.log('Code analysis:', analysis);
-      
-      // Debug: Show the actual return statement
-      if (analysis.returnStatements && analysis.returnStatements.length > 0) {
-        console.log('📋 Found return statement:', analysis.returnStatements[0].value);
-        console.log('📋 Return type:', analysis.returnStatements[0].type);
-        console.log('📋 Return details:', analysis.returnStatements[0].details);
-      }
       
       // Determine which object corresponds to the selection
       this.selectedObjectName = this.codeAnalyzer.determineSelectedObject(
@@ -330,21 +317,22 @@ export class MeshSelector {
         this.selectedObjectName
       );
       
-      console.log('🎯 SELECTED OBJECT IDENTIFICATION:');
-      console.log('  Object Name:', this.selectedObjectName);
-      console.log('  Object Path:', this.selectedObjectPath);
-      console.log('  Has Valid Selection:', this.hasValidSelection());
-      console.log('  Has Valid Code Context:', this.hasValidCodeContext());
+      // Show the actual return statement and object identification
+      if (analysis.returnStatements && analysis.returnStatements.length > 0) {
+        const returnStmt = analysis.returnStatements[0];
+        console.log('📋 Return:', returnStmt.value.substring(0, 50) + (returnStmt.value.length > 50 ? '...' : ''));
+        console.log('📋 Type:', returnStmt.type);
+      }
+      
+      console.log('🎯 Object:', this.selectedObjectName || 'none');
+      if (this.selectedObjectPath) {
+        console.log('📁 Path:', this.selectedObjectPath);
+      }
       
       if (this.selectedObjectName) {
-        console.log('✅ Successfully identified object for selection:', this.selectedObjectName);
-        if (this.selectedObjectPath) {
-          console.log('📁 Object is in complex return statement with path:', this.selectedObjectPath);
-        } else {
-          console.log('📄 Object is in simple return statement');
-        }
+        console.log('✅ Ready for selection-aware modification');
       } else {
-        console.log('❌ Could not identify object for selection');
+        console.log('❌ No object identified');
       }
       
     } catch (error) {

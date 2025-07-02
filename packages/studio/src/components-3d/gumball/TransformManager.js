@@ -49,7 +49,7 @@ export class TransformManager {
    * Handle the start of a transform operation
    */
   onTransformStart(initialTransform, selectedShape, meshSelector = null) {
-    console.log('🚀 TransformManager: Transform started');
+    console.log('🚀 Transform started');
     
     // Store the original transform state and shape reference
     this.originalTransform = initialTransform;
@@ -64,11 +64,9 @@ export class TransformManager {
       this.selectedObjectName = this.selectionContext.selectedObjectName;
       this.selectedObjectPath = this.selectionContext.selectedObjectPath;
       
-      console.log('🎯 Transform will modify object:', this.selectedObjectName);
-      if (this.selectedObjectPath) {
-        console.log('📁 Object path in return statement:', this.selectedObjectPath);
+      if (this.selectedObjectName) {
+        console.log('🎯 Will modify:', this.selectedObjectName);
       }
-      console.log('Selection context loaded:', this.selectionContext);
     }
     
     // Reset displacement tracking for this operation
@@ -81,17 +79,20 @@ export class TransformManager {
   /**
    * Handle transform changes during drag
    */
-  onTransformChange() {
-    // This could be used for preview updates if needed
-    console.log('TransformManager: Transform changed');
+  onTransformChange(transformData) {
+    // Update the transform data
+    this.currentTransform = transformData;
+    
+    // Call the change callback if provided
+    if (this.onChangeCallback) {
+      this.onChangeCallback(transformData);
+    }
   }
 
   /**
    * Handle the end of a transform operation
    */
   onTransformEnd(transformData) {
-    console.log('TransformManager: Transform ended with data:', transformData);
-    
     if (!transformData) return;
 
     switch (transformData.type) {
@@ -111,24 +112,17 @@ export class TransformManager {
    * Handle translation transform
    */
   handleTranslation([x, y, z]) {
-    console.log('TransformManager: Handling translation:', { x, y, z });
-    
     // Add to running total (simple vector addition)
     this.totalDisplacement.x += x;
     this.totalDisplacement.y += y;
     this.totalDisplacement.z += z;
     
-    console.log('Total displacement:', this.totalDisplacement);
-    
-    // Log the transform command
-    this.logTransformCommand('translate', [x, y, z]);
-    this.logTotalDisplacement();
-    
-    // Restore the original position immediately
-    // COMMENTED OUT: Allow mesh to move visually during drag
-    // if (this.originalPosition && this.selectedShape && this.selectedShape.position) {
-    //   this.selectedShape.position.copy(this.originalPosition);
-    // }
+    console.log('📐 Translation:', { x: x.toFixed(2), y: y.toFixed(2), z: z.toFixed(2) });
+    console.log('📊 Total displacement:', { 
+      x: this.totalDisplacement.x.toFixed(2), 
+      y: this.totalDisplacement.y.toFixed(2), 
+      z: this.totalDisplacement.z.toFixed(2) 
+    });
     
     // Update the parametric code with the total displacement
     this.updateCodeWithTransform();
@@ -138,8 +132,6 @@ export class TransformManager {
    * Handle rotation transform
    */
   handleRotation([angle, center, axis]) {
-    console.log('TransformManager: Handling rotation:', { angle, center, axis });
-    
     // Accumulate rotation (simple angle addition for same axis)
     if (this.totalRotation.axis[0] === axis[0] && 
         this.totalRotation.axis[1] === axis[1] && 
@@ -152,11 +144,11 @@ export class TransformManager {
       this.totalRotation.axis = [...axis];
     }
     
-    console.log('Total rotation:', this.totalRotation);
-    
-    // Log the transform command
-    this.logTransformCommand('rotate', [angle, center, axis]);
-    this.logTotalRotation();
+    console.log('🔄 Rotation:', { angle: angle.toFixed(2), axis: axis.map(v => v.toFixed(2)) });
+    console.log('📊 Total rotation:', { 
+      angle: this.totalRotation.angle.toFixed(2), 
+      axis: this.totalRotation.axis.map(v => v.toFixed(2)) 
+    });
     
     // Update the parametric code with the accumulated rotation
     this.updateCodeWithRotation();
@@ -166,10 +158,7 @@ export class TransformManager {
    * Handle scale transform
    */
   handleScale([scale, center]) {
-    console.log('TransformManager: Handling scale:', { scale, center });
-    
-    // Log the transform command
-    this.logTransformCommand('scale', [scale, center]);
+    console.log('📏 Scale:', { scale: scale.toFixed(2), center: center.map(v => v.toFixed(2)) });
     
     // For now, we'll just log scale commands
     // TODO: Implement scale parameter updates in the code
@@ -181,7 +170,7 @@ export class TransformManager {
   updateCodeWithTransform() {
     // Try selection-aware code modification first
     if (this.hasValidSelectionContext()) {
-      console.log('Using selection-aware code modification');
+      console.log('🎯 Using selection-aware modification for:', this.selectedObjectName);
       const success = this.codeUpdater.updateSelectedObjectTransform(
         this.selectedObjectName,
         this.selectedObjectPath,
@@ -194,19 +183,39 @@ export class TransformManager {
         const currentCode = this.store.code.current;
         this.codeUpdater.triggerRebuild(currentCode);
         
+        // === MESH RESET LOGGING ===
+        console.log('=== MESH RESET PROCESS (Selection-aware) ===');
+        if (this.selectedShape) {
+          console.log('--- BEFORE RESET ---');
+          console.log('Mesh position before reset:', this.selectedShape.position.toArray());
+          console.log('Mesh rotation before reset:', this.selectedShape.rotation.toArray());
+          console.log('Mesh scale before reset:', this.selectedShape.scale.toArray());
+          console.log('Mesh matrix before reset:', this.selectedShape.matrix.elements);
+          console.log('Mesh world position before reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
+          
+          // Reset the mesh's transform to avoid double application
+          this.selectedShape.position.set(0, 0, 0);
+          this.selectedShape.rotation.set(0, 0, 0);
+          this.selectedShape.scale.set(1, 1, 1);
+          
+          console.log('--- AFTER RESET ---');
+          console.log('Mesh position after reset:', this.selectedShape.position.toArray());
+          console.log('Mesh rotation after reset:', this.selectedShape.rotation.toArray());
+          console.log('Mesh scale after reset:', this.selectedShape.scale.toArray());
+          console.log('Mesh matrix after reset:', this.selectedShape.matrix.elements);
+          console.log('Mesh world position after reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
+        }
         // Reset the total displacement tracking after successful update
         this.totalDisplacement = { x: 0, y: 0, z: 0 };
-        console.log('Reset total displacement tracking');
-        
-        console.log('Selection-aware transform completed');
+        console.log('✅ Selection-aware transform completed');
         return;
       } else {
-        console.log('Selection-aware modification failed, falling back to original method');
+        console.log('⚠️ Selection-aware modification failed, using fallback');
       }
     }
     
     // Fallback to original method
-    console.log('Using original code modification method');
+    console.log('🔄 Using fallback code modification method');
     const success = this.codeUpdater.updateTranslationParams(this.totalDisplacement);
     
     if (success) {
@@ -214,13 +223,31 @@ export class TransformManager {
       const currentCode = this.store.code.current;
       this.codeUpdater.triggerRebuild(currentCode);
       
+      // === MESH RESET LOGGING ===
+      console.log('=== MESH RESET PROCESS (Fallback) ===');
+      if (this.selectedShape) {
+        console.log('--- BEFORE RESET ---');
+        console.log('Mesh position before reset:', this.selectedShape.position.toArray());
+        console.log('Mesh rotation before reset:', this.selectedShape.rotation.toArray());
+        console.log('Mesh scale before reset:', this.selectedShape.scale.toArray());
+        console.log('Mesh matrix before reset:', this.selectedShape.matrix.elements);
+        console.log('Mesh world position before reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
+        
+        // Reset the mesh's transform to avoid double application
+        this.selectedShape.position.set(0, 0, 0);
+        this.selectedShape.rotation.set(0, 0, 0);
+        this.selectedShape.scale.set(1, 1, 1);
+        
+        console.log('--- AFTER RESET ---');
+        console.log('Mesh position after reset:', this.selectedShape.position.toArray());
+        console.log('Mesh rotation after reset:', this.selectedShape.rotation.toArray());
+        console.log('Mesh scale after reset:', this.selectedShape.scale.toArray());
+        console.log('Mesh matrix after reset:', this.selectedShape.matrix.elements);
+        console.log('Mesh world position after reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
+      }
       // Reset the total displacement tracking after successful update
       this.totalDisplacement = { x: 0, y: 0, z: 0 };
-      console.log('Reset total displacement tracking');
-      
-      // Note: The mesh will be recreated by the parametric system
-      // The MeshSelector should handle tracking the new mesh and restoring selection
-      console.log('Transform completed, mesh will be recreated by parametric system');
+      console.log('✅ Transform completed, mesh will be recreated');
     }
   }
 
@@ -230,7 +257,7 @@ export class TransformManager {
   updateCodeWithRotation() {
     // Try selection-aware code modification first
     if (this.hasValidSelectionContext()) {
-      console.log('Using selection-aware rotation code modification');
+      console.log('🎯 Using selection-aware rotation for:', this.selectedObjectName);
       const success = this.codeUpdater.updateSelectedObjectTransform(
         this.selectedObjectName,
         this.selectedObjectPath,
@@ -243,19 +270,23 @@ export class TransformManager {
         const currentCode = this.store.code.current;
         this.codeUpdater.triggerRebuild(currentCode);
         
+        // Reset the mesh's transform to avoid double application
+        if (this.selectedShape) {
+          this.selectedShape.position.set(0, 0, 0);
+          this.selectedShape.rotation.set(0, 0, 0);
+          this.selectedShape.scale.set(1, 1, 1);
+        }
         // Reset the total rotation tracking after successful update
         this.totalRotation = { angle: 0, axis: [0, 0, 1] };
-        console.log('Reset total rotation tracking');
-        
-        console.log('Selection-aware rotation completed');
+        console.log('✅ Selection-aware rotation completed');
         return;
       } else {
-        console.log('Selection-aware rotation modification failed, falling back to original method');
+        console.log('⚠️ Selection-aware rotation failed, using fallback');
       }
     }
     
     // Fallback to original method
-    console.log('Using original rotation code modification method');
+    console.log('🔄 Using fallback rotation method');
     const success = this.codeUpdater.updateRotationParams(this.totalRotation.angle, this.totalRotation.axis);
     
     if (success) {
@@ -263,13 +294,15 @@ export class TransformManager {
       const currentCode = this.store.code.current;
       this.codeUpdater.triggerRebuild(currentCode);
       
+      // Reset the mesh's transform to avoid double application
+      if (this.selectedShape) {
+        this.selectedShape.position.set(0, 0, 0);
+        this.selectedShape.rotation.set(0, 0, 0);
+        this.selectedShape.scale.set(1, 1, 1);
+      }
       // Reset the total rotation tracking after successful update
       this.totalRotation = { angle: 0, axis: [0, 0, 1] };
-      console.log('Reset total rotation tracking');
-      
-      // Note: The mesh will be recreated by the parametric system
-      // The MeshSelector should handle tracking the new mesh and restoring selection
-      console.log('Rotation completed, mesh will be recreated by parametric system');
+      console.log('✅ Rotation completed, mesh will be recreated');
     }
   }
 
@@ -331,7 +364,7 @@ export class TransformManager {
     this.selectedObjectPath = null;
     this.selectionContext = null;
     this.transformParametersInitialized = false;
-    console.log('TransformManager: Reset all transform state');
+    console.log('🔄 TransformManager: Reset all transform state');
   }
 
   /**
@@ -353,10 +386,7 @@ export class TransformManager {
     this.selectionContext = selectionContext;
     this.selectedObjectName = selectionContext.selectedObjectName;
     this.selectedObjectPath = selectionContext.selectedObjectPath;
-    console.log('🔄 TransformManager: Selection context set');
-    console.log('  Object Name:', this.selectedObjectName);
-    console.log('  Object Path:', this.selectedObjectPath);
-    console.log('  Has Valid Context:', this.hasValidSelectionContext());
+    console.log('🔄 Context set:', this.selectedObjectName || 'none');
   }
 
   /**

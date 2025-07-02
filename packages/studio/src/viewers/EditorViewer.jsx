@@ -42,12 +42,10 @@ const useClickHighlight = (selectMode, onSelected) => {
   const [faceSelected, toggleFaceSelection] = useSelection();
   const [edgeSelected, toggleEdgeSelection] = useSelection();
 
-  console.log('useClickHighlight: current selection state:', { faceSelected, edgeSelected });
-
   const updateFaceSelected = ["all", "faces"].includes(selectMode)
     ? (e, faceId) => {
         e.stopPropagation();
-        console.log('Face clicked, ID:', faceId);
+        console.log('👆 Face selected:', faceId);
         toggleFaceSelection({ type: 'face', id: faceId });
         if (edgeSelected) {
           toggleEdgeSelection(edgeSelected);
@@ -58,7 +56,7 @@ const useClickHighlight = (selectMode, onSelected) => {
   const updateEdgeSelected = ["all", "edges"].includes(selectMode)
     ? (e, edgeId) => {
         e.stopPropagation();
-        console.log('Edge clicked, ID:', edgeId);
+        console.log('👆 Edge selected:', edgeId);
         toggleEdgeSelection({ type: 'edge', id: edgeId });
         if (faceSelected) {
           toggleFaceSelection(faceSelected);
@@ -67,7 +65,7 @@ const useClickHighlight = (selectMode, onSelected) => {
     : null;
 
   const clearSelection = () => {
-    console.log('Clearing selection - Stack trace:', new Error().stack);
+    console.log('🗑️ Selection cleared');
     if (faceSelected) {
       toggleFaceSelection(faceSelected);
     }
@@ -101,7 +99,7 @@ const ClickOutsideDetector = ({ onClearSelection, hasSelection }) => {
                               target.parent?.userData?.isTransformControl;
         
         if (!isGumballClick) {
-          console.log('Click outside detected - clearing selection');
+          console.log('🗑️ Click outside - clearing selection');
           e.stopPropagation();
           onClearSelection();
         } else {
@@ -197,8 +195,21 @@ export default observer(function EditorViewer({
 
   // Callback to ensure ref is properly set when mesh is created/recreated
   const handleMeshRef = (mesh) => {
-    console.log('Mesh ref updated:', mesh ? 'new mesh' : 'null', 'key:', meshKey, 'selection:', { faceSelected, edgeSelected });
+    console.log('=== MESH REF CALLBACK ===');
+    console.log('Previous mesh ref:', selectedMeshRef.current);
+    console.log('New mesh ref:', mesh);
+    console.log('Mesh position:', mesh ? mesh.position.toArray() : null);
+    console.log('Mesh world position:', mesh ? mesh.getWorldPosition(new THREE.Vector3()).toArray() : null);
+    
     selectedMeshRef.current = mesh;
+    
+    if (mesh) {
+      console.log('✅ Mesh ref updated successfully');
+      console.log('Final mesh position:', mesh.position.toArray());
+      console.log('Final mesh world position:', mesh.getWorldPosition(new THREE.Vector3()).toArray());
+    } else {
+      console.log('❌ Mesh ref cleared');
+    }
   };
 
   // Generate a unique key for the mesh that changes when the shape is updated
@@ -226,7 +237,13 @@ export default observer(function EditorViewer({
       key += `-${vertexHash}`;
     }
     
-    console.log('Mesh key generated:', key, 'shape:', { name: shape.name, id: shape.id });
+    console.log('=== MESH KEY GENERATION ===');
+    console.log('Shape name:', shape?.name);
+    console.log('Shape ID:', shape?.id);
+    console.log('Mesh vertices count:', shape?.mesh?.vertices?.length);
+    console.log('Mesh triangles count:', shape?.mesh?.triangles?.length);
+    console.log('Generated mesh key:', key);
+    
     return key;
   }, [shape?.name, shape?.id, shape?.mesh?.vertices?.length, shape?.mesh?.triangles?.length]);
 
@@ -234,32 +251,32 @@ export default observer(function EditorViewer({
   useEffect(() => {
     if (!shape || !shape.mesh) return;
     
-    console.log('Checking selection restoration:', { 
-      faceSelected, 
-      edgeSelected, 
-      faceGroups: shape.mesh.faceGroups?.length,
-      edgeGroups: shape.edges?.edgeGroups?.length 
-    });
+    console.log('=== SELECTION RESTORATION CHECK ===');
+    console.log('Shape mesh available:', !!shape.mesh);
+    console.log('Face selected:', faceSelected);
+    console.log('Edge selected:', edgeSelected);
     
     // Check if we have a face selection that needs to be restored
     if (faceSelected && faceSelected.type === 'face') {
       const faceExists = shape.mesh.faceGroups?.some(group => group.faceId === faceSelected.id);
+      console.log('Face selection check - face exists:', faceExists);
       if (!faceExists) {
-        console.log('Selected face no longer exists, clearing selection. Face ID:', faceSelected.id);
+        console.log('🗑️ Selected face no longer exists, clearing selection');
         clearSelection();
       } else {
-        console.log('Face selection is valid, keeping selection. Face ID:', faceSelected.id);
+        console.log('✅ Face selection restored successfully');
       }
     }
     
     // Check if we have an edge selection that needs to be restored
     if (edgeSelected && edgeSelected.type === 'edge') {
       const edgeExists = shape.edges?.edgeGroups?.some(group => group.edgeId === edgeSelected.id);
+      console.log('Edge selection check - edge exists:', edgeExists);
       if (!edgeExists) {
-        console.log('Selected edge no longer exists, clearing selection. Edge ID:', edgeSelected.id);
+        console.log('🗑️ Selected edge no longer exists, clearing selection');
         clearSelection();
       } else {
-        console.log('Edge selection is valid, keeping selection. Edge ID:', edgeSelected.id);
+        console.log('✅ Edge selection restored successfully');
       }
     }
   }, [shape, faceSelected, edgeSelected, clearSelection]);
@@ -279,17 +296,18 @@ export default observer(function EditorViewer({
     return edgeGroupIndex >= 0 ? edgeGroupIndex : null;
   }, [edgeSelected, shape?.edges?.edgeGroups]);
 
-  // Show gumball when something is selected
+  // Show/hide gumball based on selection
+  const [gumballVisible, setGumballVisible] = useState(false);
   useEffect(() => {
-    console.log('Selection state changed:', { faceSelected, edgeSelected });
-    if (faceSelected !== null || edgeSelected !== null) {
-      console.log('Showing gumball for selection');
-      store.ui.showGumballForSelection();
-    } else {
-      console.log('Hiding gumball - no selection');
-      store.ui.hideGumball();
+    const hasSelection = faceSelected || edgeSelected;
+    if (hasSelection && !gumballVisible) {
+      console.log('🎯 Gumball visible');
+      setGumballVisible(true);
+    } else if (!hasSelection && gumballVisible) {
+      console.log('🎯 Gumball hidden');
+      setGumballVisible(false);
     }
-  }, [faceSelected, edgeSelected, store.ui]);
+  }, [faceSelected, edgeSelected, gumballVisible]);
 
   // Compute a dummy Object3D at the mesh's origin in world space (proxy gumball)
   const gumballProxy = useMemo(() => {
@@ -364,10 +382,8 @@ export default observer(function EditorViewer({
   };
 
   const handleTransformChange = () => {
-    console.log('EditorViewer: handleTransformChange called');
     // Move the real mesh in real-time during drag
     if (selectedMeshRef.current && gumballTarget) {
-      console.log('EditorViewer: Moving real mesh to match dummy position');
       // Copy the position from the dummy to the real mesh
       selectedMeshRef.current.position.copy(gumballTarget.position);
       
@@ -385,6 +401,113 @@ export default observer(function EditorViewer({
 
   const handleTransformEnd = (transformData) => {
     if (!selectedMeshRef.current || !selectedMeshRef.current.__initialTransform) return;
+    
+    // Log mesh, gumball, and parametric positions
+    const meshPos = selectedMeshRef.current.position;
+    const gumballPos = gumballTarget?.position;
+    const gumballProxyPos = gumballProxy?.position;
+    
+    // Extract defaultParams from code
+    let paramCoords = {};
+    const code = store.code.current;
+    const defaultParamsMatch = code.match(/const\s+defaultParams\s*=\s*{([\s\S]*?)};/);
+    if (defaultParamsMatch) {
+      const paramsStr = defaultParamsMatch[1];
+      // Parse key: value pairs (simple, not robust to nested objects)
+      paramsStr.split(/,\s*/).forEach(pair => {
+        const match = pair.match(/([a-zA-Z0-9_]+):\s*([^,]+)/);
+        if (match) {
+          paramCoords[match[1]] = match[2];
+        }
+      });
+    }
+    
+    // Prefer x/y/z_translate if present
+    const paramLog = (paramCoords.x_translate || paramCoords.y_translate || paramCoords.z_translate)
+      ? {
+          x_translate: paramCoords.x_translate,
+          y_translate: paramCoords.y_translate,
+          z_translate: paramCoords.z_translate
+        }
+      : paramCoords;
+    
+    // === COMPREHENSIVE DEBUG LOGGING ===
+    console.log('=== TRANSFORM END ANALYSIS ===');
+    console.log('Shape name:', shape?.name || 'unknown');
+    console.log('Shape type:', shape?.constructor?.name || 'unknown');
+    
+    // Mesh state analysis
+    console.log('--- MESH STATE ---');
+    console.log('Mesh position (world):', meshPos ? meshPos.toArray() : null);
+    console.log('Mesh position (local):', selectedMeshRef.current ? selectedMeshRef.current.position.toArray() : null);
+    console.log('Mesh matrix world:', selectedMeshRef.current ? selectedMeshRef.current.matrixWorld.elements : null);
+    console.log('Mesh matrix:', selectedMeshRef.current ? selectedMeshRef.current.matrix.elements : null);
+    
+    // Gumball state analysis
+    console.log('--- GUMBALL STATE ---');
+    console.log('Gumball target position:', gumballPos ? gumballPos.toArray() : null);
+    console.log('Gumball proxy position:', gumballProxyPos ? gumballProxyPos.toArray() : null);
+    
+    // Coordinate system analysis
+    console.log('--- COORDINATE ANALYSIS ---');
+    const meshWorldPos = new THREE.Vector3();
+    selectedMeshRef.current?.getWorldPosition(meshWorldPos);
+    console.log('Mesh world position (getWorldPosition):', meshWorldPos.toArray());
+    
+    const meshLocalPos = selectedMeshRef.current?.position.clone();
+    console.log('Mesh local position (clone):', meshLocalPos ? meshLocalPos.toArray() : null);
+    
+    // Parametric coordinates analysis
+    console.log('--- PARAMETRIC COORDINATES ---');
+    console.log('Raw parametric coords:', paramLog);
+    
+    // Check for coordinate matching (potential double movement indicator)
+    const meshX = meshPos ? meshPos.x : 0;
+    const meshY = meshPos ? meshPos.y : 0;
+    const meshZ = meshPos ? meshPos.z : 0;
+    const paramX = paramCoords.x_translate ? parseFloat(paramCoords.x_translate) : 0;
+    const paramY = paramCoords.y_translate ? parseFloat(paramCoords.y_translate) : 0;
+    const paramZ = paramCoords.z_translate ? parseFloat(paramCoords.z_translate) : 0;
+    
+    const xDiff = Math.abs(meshX - paramX);
+    const yDiff = Math.abs(meshY - paramY);
+    const zDiff = Math.abs(meshZ - paramZ);
+    
+    console.log('--- COORDINATE MATCHING ANALYSIS ---');
+    console.log('Mesh X:', meshX, 'Param X:', paramX, 'Diff:', xDiff);
+    console.log('Mesh Y:', meshY, 'Param Y:', paramY, 'Diff:', yDiff);
+    console.log('Mesh Z:', meshZ, 'Param Z:', paramZ, 'Diff:', zDiff);
+    
+    if (xDiff < 0.1 && yDiff < 0.1 && zDiff < 0.1) {
+      console.log('⚠️  WARNING: Parametric coordinates EXACTLY match mesh position!');
+      console.log('⚠️  This indicates potential double movement issue!');
+    } else {
+      console.log('✅ Parametric coordinates differ from mesh position (expected behavior)');
+    }
+    
+    // Initial transform state (if available)
+    if (selectedMeshRef.current.__initialTransform) {
+      console.log('--- INITIAL TRANSFORM STATE ---');
+      console.log('Initial position:', selectedMeshRef.current.__initialTransform.position.toArray());
+      console.log('Initial rotation:', selectedMeshRef.current.__initialTransform.rotation.toArray());
+      console.log('Initial scale:', selectedMeshRef.current.__initialTransform.scale.toArray());
+      
+      // Calculate total displacement
+      const initialPos = selectedMeshRef.current.__initialTransform.position;
+      const totalDisplacement = meshPos.clone().sub(initialPos);
+      console.log('Total displacement from initial:', totalDisplacement.toArray());
+    }
+    
+    // Shape-specific analysis
+    console.log('--- SHAPE-SPECIFIC ANALYSIS ---');
+    if (shape?.mesh) {
+      console.log('Mesh vertices count:', shape.mesh.vertices?.length || 0);
+      console.log('Mesh triangles count:', shape.mesh.triangles?.length || 0);
+      console.log('Mesh face groups count:', shape.mesh.faceGroups?.length || 0);
+    }
+    
+    console.log('=== END TRANSFORM ANALYSIS ===');
+    
     // Forward the transformData to the TransformManager logic if needed
     // (The advanced gumball system should already handle this)
     // Clean up
@@ -458,7 +581,7 @@ export default observer(function EditorViewer({
         {gumballTarget && <primitive object={gumballTarget} />}
         {gumballProxy && <primitive object={gumballProxy} />}
         {/* Render gumball visually at mesh center, but functionally at mesh origin */}
-        {store.ui.showGumball && gumballTarget && gumballProxy && (
+        {gumballVisible && gumballTarget && gumballProxy && (
           <group position={(() => {
             // Ensure offset is in world space
             const proxyWorld = gumballProxy.getWorldPosition(new THREE.Vector3());
@@ -479,7 +602,7 @@ export default observer(function EditorViewer({
         <ClickOutsideDetector onClearSelection={clearSelection} hasSelection={faceSelected !== null || edgeSelected !== null} />
       </Canvas>
       {/* Mode switcher at the bottom center, only when gumball is visible */}
-      {store.ui.showGumball && (
+      {gumballVisible && (
         <ModeSwitcherBar>
           <span style={{ color: '#fff', fontWeight: 600, letterSpacing: '1px' }}>Gumball Mode:</span>
           <ModeSelect

@@ -16,7 +16,7 @@ export class CodeUpdater {
       console.log('Current code length:', currentCode.length);
       
       // Parse the defaultParams object to find current translation values
-      const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]+)}/);
+      const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]*)}/s);
       if (!defaultParamsMatch) {
         console.log('No defaultParams found in code');
         return false;
@@ -35,11 +35,30 @@ export class CodeUpdater {
       const currentZ = zTranslateMatch ? parseFloat(zTranslateMatch[1]) : 0;
       
       console.log('Current translation values:', { x: currentX, y: currentY, z: currentZ });
+      console.log('Total displacement to add:', totalDisplacement);
       
       // Calculate new values by adding the displacement
       const newX = currentX + totalDisplacement.x;
       const newY = currentY + totalDisplacement.y;
       const newZ = currentZ + totalDisplacement.z;
+      
+      console.log('=== COORDINATE CALCULATION ANALYSIS ===');
+      console.log('Current parametric X:', currentX, '+ Displacement X:', totalDisplacement.x, '= New X:', newX);
+      console.log('Current parametric Y:', currentY, '+ Displacement Y:', totalDisplacement.y, '= New Y:', newY);
+      console.log('Current parametric Z:', currentZ, '+ Displacement Z:', totalDisplacement.z, '= New Z:', newZ);
+      
+      // Check if this will cause double movement
+      const xDiff = Math.abs(newX - totalDisplacement.x);
+      const yDiff = Math.abs(newY - totalDisplacement.y);
+      const zDiff = Math.abs(newZ - totalDisplacement.z);
+      
+      if (xDiff < 0.1 && yDiff < 0.1 && zDiff < 0.1) {
+        console.log('⚠️  WARNING: New parametric coordinates will match mesh position!');
+        console.log('⚠️  This will cause double movement on rebuild!');
+        console.log('⚠️  The issue is: parametric coords should be the TARGET, not the current mesh position!');
+      } else {
+        console.log('✅ New parametric coordinates differ from displacement (expected)');
+      }
       
       console.log('New translation values:', { x: newX, y: newY, z: newZ });
       
@@ -78,7 +97,7 @@ export class CodeUpdater {
       
       // Replace the defaultParams in the code
       const newCode = currentCode.replace(
-        /const\s+defaultParams\s*=\s*{([^}]+)}/,
+        /const\s+defaultParams\s*=\s*{([^}]*)}/s,
         `const defaultParams = {${newParamsContent}}`
       );
       
@@ -105,7 +124,7 @@ export class CodeUpdater {
       console.log('=== Starting rotation code update process ===');
       const currentCode = this.store.code.current;
       // Parse the defaultParams object to find current rotation values
-      const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]+)}/);
+      const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]*)}/s);
       if (!defaultParamsMatch) {
         console.log('No defaultParams found in code');
         return false;
@@ -149,7 +168,7 @@ export class CodeUpdater {
       
       // Replace the defaultParams in the code
       let newCode = currentCode.replace(
-        /const\s+defaultParams\s*=\s*{([^}]+)}/,
+        /const\s+defaultParams\s*=\s*{([^}]*)}/s,
         `const defaultParams = {${paramsContent}}`
       );
       
@@ -238,7 +257,7 @@ export class CodeUpdater {
       const currentCode = this.store.code.current;
       
       // Check if defaultParams already exists (including empty ones)
-      const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]*)}/);
+      const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]*)}/s);
       
       if (defaultParamsMatch) {
         // defaultParams exists, check if transform parameters are already there
@@ -296,7 +315,7 @@ export class CodeUpdater {
         
         if (needsUpdate) {
           const newCode = currentCode.replace(
-            /const\s+defaultParams\s*=\s*{[^}]*}/,
+            /const\s+defaultParams\s*=\s*{([^}]*)}/s,
             `const defaultParams = {${paramsContent}}`
           );
           console.log('Adding transform parameters to existing defaultParams');
@@ -391,19 +410,15 @@ export class CodeUpdater {
    */
   triggerRebuild(newCode) {
     try {
-      console.log('=== Starting reload process ===');
-      
       // Use the store's updateCode method to ensure proper UI update
-      console.log('Updating code via store.updateCode...');
       this.store.updateCode(newCode);
       
       // Also update through the code state for redundancy
-      console.log('Updating code via store.code.update...');
       this.store.code.update(newCode, true);
       
       // Extract the updated parameters from the new code
       const updatedParams = {};
-      const paramsMatch = newCode.match(/const\s+defaultParams\s*=\s*{([^}]+)}/);
+      const paramsMatch = newCode.match(/const\s+defaultParams\s*=\s*{([^}]+)}/s);
       if (paramsMatch) {
         const paramsStr = paramsMatch[1];
         // Parse the parameters
@@ -413,16 +428,14 @@ export class CodeUpdater {
         }
       }
       
-      console.log('Extracted parameters:', updatedParams);
-      
       // Trigger a rebuild with the updated parameters after a short delay
       setTimeout(() => {
         if (Object.keys(updatedParams).length > 0) {
-          console.log('Triggering rebuild with updated parameters:', updatedParams);
+          console.log('🔄 Triggering rebuild with parameters:', Object.keys(updatedParams).length, 'params');
           this.store.process(updatedParams);
         } else {
           // If no parameters found, just trigger a general rebuild
-          console.log('Triggering general rebuild');
+          console.log('🔄 Triggering general rebuild');
           this.store.process();
         }
       }, 100);
@@ -433,10 +446,10 @@ export class CodeUpdater {
       });
       window.dispatchEvent(codeUpdateEvent);
       
-      console.log('Rebuild triggered successfully');
+      console.log('✅ Rebuild triggered successfully');
       
     } catch (error) {
-      console.error('Error during reload process:', error);
+      console.error('❌ Error during reload process:', error);
     }
   }
 
@@ -445,44 +458,156 @@ export class CodeUpdater {
    */
   updateSelectedObjectTransform(selectedObjectName, selectedObjectPath, transformType, values) {
     try {
-      console.log('=== Starting selection-aware code update ===');
-      console.log('Selected object name:', selectedObjectName);
-      console.log('Selected object path:', selectedObjectPath);
-      console.log('Transform type:', transformType);
-      console.log('Values:', values);
+      console.log('🎯 Selection-aware update:', {
+        object: selectedObjectName,
+        path: selectedObjectPath || 'none',
+        type: transformType,
+        values: values.map(v => typeof v === 'number' ? v.toFixed(2) : v)
+      });
 
       const currentCode = this.store.code.current;
-      
-      if (selectedObjectPath) {
-        // Handle complex return statements (e.g., return {shape: wateringCan})
+      // Analyze code to determine return type
+      const analyzer = this.store.codeAnalyzer || (window && window.codeAnalyzer);
+      let analysis = null;
+      if (analyzer && typeof analyzer.analyzeCode === 'function') {
+        analysis = analyzer.analyzeCode(currentCode);
+      } else {
+        // fallback: require here if possible
+        try {
+          const { CodeAnalyzer } = require('./CodeAnalyzer.js');
+          analysis = new CodeAnalyzer().analyzeCode(currentCode);
+        } catch (e) {
+          // ignore
+        }
+      }
+      let returnType = null;
+      let detectedReturn = null;
+      if (analysis && analysis.returnStatements && analysis.returnStatements.length > 0) {
+        detectedReturn = analysis.returnStatements[0];
+        if (detectedReturn.details && detectedReturn.details.baseVariable === selectedObjectName && detectedReturn.type === 'chain') {
+          returnType = 'chain';
+        } else if (selectedObjectPath) {
+          returnType = 'complex';
+        } else {
+          returnType = detectedReturn.type;
+        }
+      }
+      console.log('🔍 Code analysis:', analysis);
+      console.log('🔍 Detected return statement:', detectedReturn);
+      console.log('🔍 Decided returnType:', returnType);
+
+      if (returnType === 'chain') {
+        console.log('🟦 Calling updateChainReturn');
+        return this.updateChainReturn(currentCode, selectedObjectName, transformType, values);
+      } else if (selectedObjectPath) {
+        console.log('🟩 Calling updateComplexReturn');
         return this.updateComplexReturn(currentCode, selectedObjectName, selectedObjectPath, transformType, values);
       } else {
-        // Handle simple return statements (e.g., return vase)
+        console.log('🟨 Calling updateSimpleReturn');
         return this.updateSimpleReturn(currentCode, selectedObjectName, transformType, values);
       }
     } catch (error) {
-      console.error('Error in selection-aware code update:', error);
+      console.error('❌ Error in selection-aware code update:', error);
       return false;
     }
+  }
+
+  /**
+   * Update chain return statements (e.g., return shape.fuse(thread).translate(...))
+   */
+  updateChainReturn(code, objectName, transformType, values) {
+    console.log('📝 Updating chain return statement');
+    // Find the return statement with a chain starting with objectName
+    const returnPattern = new RegExp(`(return\\s+)(${objectName}(?:\\.[^;]+)+);`);
+    const returnMatch = code.match(returnPattern);
+    console.log('📝 updateChainReturn: code snippet match:', returnMatch ? returnMatch[0] : 'NO MATCH');
+    if (!returnMatch) {
+      console.error('❌ Could not find chain return for object:', objectName);
+      return false;
+    }
+    let chain = returnMatch[2];
+    // Replace or add the transform in the chain
+    if (chain.includes(`.${transformType}(`)) {
+      // Replace existing
+      chain = chain.replace(
+        new RegExp(`\\.${transformType}\\([^)]+\\)`),
+        `.${transformType}(${values.join(', ')})`
+      );
+    } else {
+      // Add at the end
+      chain = `${chain}.${transformType}(${values.join(', ')})`;
+    }
+    const newReturn = `${returnMatch[1]}${chain};`;
+    const newCode = code.replace(returnPattern, newReturn);
+    if (this.validateCodeModification(code, newCode)) {
+      this.store.code.update(newCode, true);
+      return true;
+    }
+    return false;
   }
 
   /**
    * Update complex return statements (e.g., return {shape: wateringCan, name: "Watering Can"})
    */
   updateComplexReturn(code, objectName, objectPath, transformType, values) {
-    console.log('Updating complex return statement');
+    console.log('📝 Updating complex return statement');
     
     // Find the variable assignment for the selected object
-    const assignmentPattern = new RegExp(`(${objectName}\\s*=\\s*[^;]+)`);
-    const assignmentMatch = code.match(assignmentPattern);
+    // Try multiple patterns to handle different assignment styles
+    
+    // Pattern 1: Simple single-line assignment
+    let assignmentPattern = new RegExp(`(${objectName}\\s*=\\s*[^;]+)`);
+    let assignmentMatch = code.match(assignmentPattern);
+    
+    // Pattern 2: Multi-line assignment with chained operations
+    if (!assignmentMatch) {
+      console.log('🔍 Trying multi-line assignment pattern for:', objectName);
+      // Look for assignments that might span multiple lines with chained operations
+      assignmentPattern = new RegExp(`(${objectName}\\s*=\\s*[^;]+(?:\\s*\\.[^;]+)*)`, 's');
+      assignmentMatch = code.match(assignmentPattern);
+    }
+    
+    // Pattern 3: Reassignment pattern (for cases like "wateringCan = wateringCan.shell(...)")
+    if (!assignmentMatch) {
+      console.log('🔍 Trying reassignment pattern for:', objectName);
+      assignmentPattern = new RegExp(`(${objectName}\\s*=\\s*${objectName}\\s*\\.[^;]+)`, 's');
+      assignmentMatch = code.match(assignmentPattern);
+    }
+    
+    // Pattern 4: Let/const declaration with multi-line assignment
+    if (!assignmentMatch) {
+      console.log('🔍 Trying let/const declaration pattern for:', objectName);
+      assignmentPattern = new RegExp(`(let\\s+${objectName}\\s*=\\s*[^;]+(?:\\s*\\.[^;]+)*)`, 's');
+      assignmentMatch = code.match(assignmentPattern);
+    }
+    
+    // Pattern 5: Const declaration with multi-line assignment
+    if (!assignmentMatch) {
+      console.log('🔍 Trying const declaration pattern for:', objectName);
+      assignmentPattern = new RegExp(`(const\\s+${objectName}\\s*=\\s*[^;]+(?:\\s*\\.[^;]+)*)`, 's');
+      assignmentMatch = code.match(assignmentPattern);
+    }
+    
+    // Pattern 6: Multi-line reassignment with complex chaining
+    if (!assignmentMatch) {
+      console.log('🔍 Trying complex multi-line reassignment pattern for:', objectName);
+      assignmentPattern = new RegExp(`(${objectName}\\s*=\\s*${objectName}\\s*\\.[^;]+(?:\\s*\\.[^;]+)*)`, 's');
+      assignmentMatch = code.match(assignmentPattern);
+    }
     
     if (!assignmentMatch) {
-      console.error('Could not find assignment for object:', objectName);
+      console.error('❌ Could not find assignment for object:', objectName);
+      console.log('🔍 Debug: Looking for assignment pattern in code snippet:');
+      const lines = code.split('\n');
+      const relevantLines = lines.filter(line => line.includes(objectName));
+      relevantLines.forEach((line, index) => {
+        console.log(`   Line ${index}: ${line.trim()}`);
+      });
       return false;
     }
     
     const assignment = assignmentMatch[1];
-    console.log('Found assignment:', assignment);
+    console.log('🔍 Found assignment:', assignment.trim());
     
     // Check if the assignment already has transforms
     if (assignment.includes(`.${transformType}(`)) {
@@ -492,7 +617,7 @@ export class CodeUpdater {
       const updatedAssignment = assignment.replace(transformPattern, newTransform);
       
       const newCode = code.replace(assignmentPattern, updatedAssignment);
-      console.log('Updated existing transform in assignment');
+      console.log('✅ Updated existing transform in assignment');
       
       // Validate and update
       if (this.validateCodeModification(code, newCode)) {
@@ -503,7 +628,8 @@ export class CodeUpdater {
       // Add new transform to the assignment
       const newAssignment = `${assignment}.${transformType}(${values.join(', ')})`;
       const newCode = code.replace(assignmentPattern, newAssignment);
-      console.log('Added new transform to assignment');
+      console.log('✅ Added new transform to assignment');
+      console.log('🔍 Modified assignment:', newAssignment.trim());
       
       // Validate and update
       if (this.validateCodeModification(code, newCode)) {
@@ -519,19 +645,17 @@ export class CodeUpdater {
    * Update simple return statements (e.g., return vase;)
    */
   updateSimpleReturn(code, objectName, transformType, values) {
-    console.log('Updating simple return statement');
-    
+    console.log('📝 Updating simple return statement');
     // Find the return statement
     const returnPattern = new RegExp(`(return\\s+)(${objectName})(\\s*;)`);
     const returnMatch = code.match(returnPattern);
-    
+    console.log('📝 updateSimpleReturn: code snippet match:', returnMatch ? returnMatch[0] : 'NO MATCH');
     if (!returnMatch) {
-      console.error('Could not find return statement for object:', objectName);
+      console.error('❌ Could not find return statement for object:', objectName);
       return false;
     }
     
     const [fullMatch, returnKeyword, object, semicolon] = returnMatch;
-    console.log('Found return statement:', fullMatch);
     
     // Check if the return already has transforms
     if (fullMatch.includes(`.${transformType}(`)) {
@@ -541,7 +665,7 @@ export class CodeUpdater {
       const updatedReturn = fullMatch.replace(transformPattern, newTransform);
       
       const newCode = code.replace(returnPattern, updatedReturn);
-      console.log('Updated existing transform in return statement');
+      console.log('✅ Updated existing transform in return statement');
       
       // Validate and update
       if (this.validateCodeModification(code, newCode)) {
@@ -552,7 +676,7 @@ export class CodeUpdater {
       // Add new transform to the return statement
       const newReturn = `${returnKeyword}${object}.${transformType}(${values.join(', ')})${semicolon}`;
       const newCode = code.replace(returnPattern, newReturn);
-      console.log('Added new transform to return statement');
+      console.log('✅ Added new transform to return statement');
       
       // Validate and update
       if (this.validateCodeModification(code, newCode)) {

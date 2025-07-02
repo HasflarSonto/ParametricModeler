@@ -51,14 +51,12 @@ const Gumball = ({
   // Handle code context synchronization
   useEffect(() => {
     if (context && context !== lastContextRef.current) {
-      console.log('=== Gumball: Context changed ===');
-      console.log('New context:', context);
+      console.log('🔄 Context changed');
       
       lastContextRef.current = context;
       
       // Update mesh selector with code context
       if (meshSelectorRef.current && context.code) {
-        console.log('🔄 Updating mesh selector with code context...');
         meshSelectorRef.current.updateCodeContext(
           context.code,
           selectedShape,
@@ -69,7 +67,6 @@ const Gumball = ({
         // Pass selection context to transform manager
         const selectionContext = meshSelectorRef.current.getSelectionContext();
         if (transformManagerRef.current && selectionContext) {
-          console.log('🔄 Passing selection context to transform manager...');
           transformManagerRef.current.setSelectionContext(selectionContext);
         }
       }

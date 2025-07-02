@@ -46,7 +46,7 @@ export class CodeAnalyzer {
       });
     }
 
-    // Match assignments to existing variables
+    // Match assignments to existing variables (but not declarations)
     const assignmentRegex = /(\w+)\s*=\s*(?!.*(?:let|const|var))/g;
     while ((match = assignmentRegex.exec(code)) !== null) {
       // Skip if it's already in our declarations
@@ -68,8 +68,8 @@ export class CodeAnalyzer {
   extractReturnStatements(code) {
     const returns = [];
     
-    // Match return statements
-    const returnRegex = /return\s+([^;]+);/g;
+    // Match return statements - updated to handle multi-line returns
+    const returnRegex = /return\s+([^;]+);/gs;
     let match;
     
     while ((match = returnRegex.exec(code)) !== null) {
@@ -91,17 +91,20 @@ export class CodeAnalyzer {
    * Analyze the pattern of a return statement
    */
   analyzeReturnPattern(returnValue) {
+    // Clean up the return value (remove extra whitespace and newlines)
+    const cleanValue = returnValue.replace(/\s+/g, ' ').trim();
+    
     // Simple variable return: return vase;
-    if (/^\w+$/.test(returnValue)) {
+    if (/^\w+$/.test(cleanValue)) {
       return {
         type: 'simple',
-        details: { variable: returnValue }
+        details: { variable: cleanValue }
       };
     }
     
     // Object return: return {shape: wateringCan, name: "Watering Can"};
-    if (returnValue.startsWith('{') && returnValue.endsWith('}')) {
-      const properties = this.extractObjectProperties(returnValue);
+    if (cleanValue.startsWith('{') && cleanValue.endsWith('}')) {
+      const properties = this.extractObjectProperties(cleanValue);
       return {
         type: 'complex',
         details: { properties }
@@ -109,14 +112,14 @@ export class CodeAnalyzer {
     }
     
     // Method chain return: return vase.translate([10, 20, 30]);
-    if (returnValue.includes('.')) {
+    if (cleanValue.includes('.')) {
       // Extract the base variable name from the chain
-      const baseVariableMatch = returnValue.match(/^(\w+)\s*\./);
+      const baseVariableMatch = cleanValue.match(/^(\w+)\s*\./);
       if (baseVariableMatch) {
         return {
           type: 'chain',
           details: { 
-            chain: returnValue,
+            chain: cleanValue,
             baseVariable: baseVariableMatch[1]
           }
         };
@@ -126,7 +129,7 @@ export class CodeAnalyzer {
     // Default case
     return {
       type: 'unknown',
-      details: { raw: returnValue }
+      details: { raw: cleanValue }
     };
   }
 
@@ -139,9 +142,8 @@ export class CodeAnalyzer {
     // Remove outer braces
     const content = objectString.slice(1, -1);
     
-    // Simple regex to extract key-value pairs
-    // This is a simplified parser - for production, consider using a proper AST parser
-    const propertyRegex = /(\w+)\s*:\s*([^,}]+)/g;
+    // Improved regex to extract key-value pairs with better handling of quoted strings
+    const propertyRegex = /(\w+)\s*:\s*([^,}]+(?:[^,}]*[^,}\s])?)/g;
     let match;
     
     while ((match = propertyRegex.exec(content)) !== null) {
@@ -212,8 +214,14 @@ export class CodeAnalyzer {
    */
   determineSelectedObject(analysis, shapeGeometryRef, faceSelected, edgeSelected) {
     if (!analysis || !analysis.returnStatements.length) {
+      console.log('🔍 No return statements found in analysis');
       return null;
     }
+
+    console.log('🔍 Analyzing return statements:', analysis.returnStatements.length);
+    analysis.returnStatements.forEach((ret, index) => {
+      console.log(`  Return ${index + 1}:`, ret);
+    });
 
     // For now, we'll use a simple heuristic:
     // 1. If there's only one return statement, use that
@@ -224,39 +232,58 @@ export class CodeAnalyzer {
     
     if (returns.length === 1) {
       const returnStmt = returns[0];
+      console.log('🔍 Single return statement found:', returnStmt);
+      
       if (returnStmt.type === 'simple') {
+        console.log('🎯 Selected simple variable:', returnStmt.details.variable);
         return returnStmt.details.variable;
       } else if (returnStmt.type === 'complex') {
         // Find the 'shape' property
         const shapeProp = returnStmt.details.properties.find(p => p.key === 'shape');
-        return shapeProp ? shapeProp.value : null;
+        if (shapeProp) {
+          console.log('🎯 Selected shape property:', shapeProp.value);
+          return shapeProp.value;
+        }
+        // Fallback to first property
+        if (returnStmt.details.properties.length > 0) {
+          console.log('🎯 Selected first property:', returnStmt.details.properties[0].value);
+          return returnStmt.details.properties[0].value;
+        }
       } else if (returnStmt.type === 'chain') {
         // Extract base variable from transformed chain
+        console.log('🎯 Selected base variable from chain:', returnStmt.details.baseVariable);
         return returnStmt.details.baseVariable;
       }
     } else {
       // Multiple return statements - look for one with 'shape' property
+      console.log('🔍 Multiple return statements, looking for shape property');
       for (const returnStmt of returns) {
         if (returnStmt.type === 'complex') {
           const shapeProp = returnStmt.details.properties.find(p => p.key === 'shape');
           if (shapeProp) {
+            console.log('🎯 Selected shape property from complex return:', shapeProp.value);
             return shapeProp.value;
           }
         } else if (returnStmt.type === 'chain') {
           // For chains, use the base variable
+          console.log('🎯 Selected base variable from chain:', returnStmt.details.baseVariable);
           return returnStmt.details.baseVariable;
         }
       }
       
       // Fallback to first return statement
       const firstReturn = returns[0];
+      console.log('🔍 Falling back to first return statement:', firstReturn);
       if (firstReturn.type === 'simple') {
+        console.log('🎯 Selected first simple variable:', firstReturn.details.variable);
         return firstReturn.details.variable;
       } else if (firstReturn.type === 'chain') {
+        console.log('🎯 Selected first base variable from chain:', firstReturn.details.baseVariable);
         return firstReturn.details.baseVariable;
       }
     }
     
+    console.log('❌ No suitable object found');
     return null;
   }
 
@@ -269,11 +296,19 @@ export class CodeAnalyzer {
     }
 
     const paths = analysis.objectPaths;
+    console.log('🔍 Looking for object path for:', selectedObjectName);
+    console.log('🔍 Available paths:', paths);
     
     // Find the path that contains our selected object
     const path = paths.find(p => p.variable === selectedObjectName);
     
-    return path ? path.path : null;
+    if (path) {
+      console.log('🎯 Found object path:', path.path);
+      return path.path;
+    } else {
+      console.log('🎯 No object path found (simple return)');
+      return null;
+    }
   }
 
   /**
