@@ -30,11 +30,7 @@ export class MeshSelector {
    * Get the actual Three.js mesh from a ShapeGeometry component
    */
   getActualMesh(shapeGeometryRef) {
-    console.log('=== getActualMesh called ===');
-    console.log('shapeGeometryRef:', shapeGeometryRef);
-    
     if (!shapeGeometryRef) {
-      console.log('No shapeGeometryRef provided');
       return null;
     }
     
@@ -42,33 +38,22 @@ export class MeshSelector {
     // We need to find the mesh that has the geometry and material
     const mesh = shapeGeometryRef;
     
-    console.log('Mesh type:', mesh.type);
-    console.log('Mesh isMesh:', mesh.isMesh);
-    console.log('Mesh isLineSegments:', mesh.isLineSegments);
-    console.log('Mesh position:', mesh.position);
-    console.log('Mesh children:', mesh.children);
-    
     // If the ref is already a Three.js mesh, return it
     if (mesh.isMesh || mesh.isLineSegments) {
-      console.log('Returning mesh directly:', mesh);
       return mesh;
     }
     
     // Otherwise, look for the mesh in the children
     if (mesh.children && mesh.children.length > 0) {
-      console.log('Looking through children...');
       // Find the first mesh or lineSegments object
       for (let i = 0; i < mesh.children.length; i++) {
         const child = mesh.children[i];
-        console.log(`Child ${i}:`, child.type, child.isMesh, child.isLineSegments, child.position);
         if (child.isMesh || child.isLineSegments) {
-          console.log('Found mesh child:', child);
           return child;
         }
       }
     }
     
-    console.log('No mesh found, returning null');
     return null;
   }
 
@@ -145,7 +130,6 @@ export class MeshSelector {
       mesh.updateMatrixWorld();
       center.applyMatrix4(mesh.matrixWorld);
       
-      console.log('Selected geometry center:', center);
       return center;
       
     } catch (error) {
@@ -161,7 +145,6 @@ export class MeshSelector {
     let center = this.getSelectedGeometryCenter(actualMesh);
     
     if (!center) {
-      console.log('No center found, using origin');
       center = new THREE.Vector3(0, 0, 0);
     }
     
@@ -175,7 +158,6 @@ export class MeshSelector {
     // Position it at the center of the selected geometry
     this.gumballPositionRef.position.copy(center);
     
-    console.log('Gumball position object created at:', center);
     return this.gumballPositionRef;
   }
 
@@ -183,11 +165,6 @@ export class MeshSelector {
    * Update the mesh references when selection changes
    */
   updateMeshReferences(shapeGeometryRef, faceSelected = null, edgeSelected = null) {
-    console.log('=== Selection changed ===');
-    console.log('shapeGeometryRef:', shapeGeometryRef);
-    console.log('faceSelected:', faceSelected);
-    console.log('edgeSelected:', edgeSelected);
-    
     // Store the current selection state
     this.lastFaceSelected = faceSelected;
     this.lastEdgeSelected = edgeSelected;
@@ -199,28 +176,13 @@ export class MeshSelector {
     const isNewMesh = !this.isSameMesh(actualMesh);
     
     if (isNewMesh) {
-      console.log('New mesh detected, updating identifier');
       this.meshIdentifier = this.generateMeshIdentifier(actualMesh);
       this.meshVersion++;
-    } else {
-      console.log('Same mesh detected after rebuild');
     }
     
     this.actualMeshRef = actualMesh;
-    console.log('Actual mesh reference updated:', actualMesh);
-    console.log('Mesh identifier:', this.meshIdentifier);
-    console.log('Mesh version:', this.meshVersion);
     
     if (actualMesh) {
-      console.log('Mesh position:', actualMesh.position);
-      console.log('Mesh world position:', actualMesh.getWorldPosition(new THREE.Vector3()));
-      
-      // Calculate and log the center of selected geometry
-      const center = this.getSelectedGeometryCenter(actualMesh);
-      if (center) {
-        console.log('Selected geometry center:', center);
-      }
-      
       // Create or update the gumball positioning object
       this.createGumballPositionObject(actualMesh);
     }
@@ -279,7 +241,6 @@ export class MeshSelector {
     this.meshIdentifier = null;
     this.meshVersion = 0;
     this.resetCodeContext();
-    console.log('MeshSelector: Reset all references');
   }
 
   /**
@@ -296,8 +257,6 @@ export class MeshSelector {
    * Update code context when selection changes
    */
   updateCodeContext(code, shapeGeometryRef, faceSelected, edgeSelected) {
-    console.log('🔄 Updating code context...');
-
     try {
       // Analyze the code to understand its structure
       const analysis = this.codeAnalyzer.analyzeCode(code);
@@ -370,6 +329,5 @@ export class MeshSelector {
     this.selectedObjectName = null;
     this.selectedObjectPath = null;
     this.codeContext = null;
-    console.log('MeshSelector: Reset code context');
   }
 } 

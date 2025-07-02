@@ -36,11 +36,9 @@ export class TransformManager {
   initializeTransformParameters() {
     // Prevent multiple initializations
     if (this.transformParametersInitialized) {
-      console.log('Transform parameters already initialized, skipping');
       return;
     }
     
-    console.log('Initializing transform parameters');
     this.codeUpdater.addTransformParametersToCode();
     this.transformParametersInitialized = true;
   }
@@ -93,36 +91,28 @@ export class TransformManager {
    * Handle the end of a transform operation
    */
   onTransformEnd(transformData) {
-    if (!transformData) return;
-
-    switch (transformData.type) {
-      case 'translate':
-        this.handleTranslation(transformData.values);
-        break;
-      case 'rotate':
-        this.handleRotation(transformData.values);
-        break;
-      case 'scale':
-        this.handleScale(transformData.values);
-        break;
+    console.log('✅ Transform completed');
+    
+    // Reset the mesh's transform to avoid double application
+    if (this.selectedShape) {
+      // Reset the mesh's transform to avoid double application
+      this.selectedShape.position.set(0, 0, 0);
+      this.selectedShape.rotation.set(0, 0, 0);
+      this.selectedShape.scale.set(1, 1, 1);
     }
+    
+    // Reset the total displacement tracking after successful update
+    this.totalDisplacement = { x: 0, y: 0, z: 0 };
   }
 
   /**
    * Handle translation transform
    */
   handleTranslation([x, y, z]) {
-    // Add to running total (simple vector addition)
+    // Accumulate the displacement
     this.totalDisplacement.x += x;
     this.totalDisplacement.y += y;
     this.totalDisplacement.z += z;
-    
-    console.log('📐 Translation:', { x: x.toFixed(2), y: y.toFixed(2), z: z.toFixed(2) });
-    console.log('📊 Total displacement:', { 
-      x: this.totalDisplacement.x.toFixed(2), 
-      y: this.totalDisplacement.y.toFixed(2), 
-      z: this.totalDisplacement.z.toFixed(2) 
-    });
     
     // Update the parametric code with the total displacement
     this.updateCodeWithTransform();
@@ -144,12 +134,6 @@ export class TransformManager {
       this.totalRotation.axis = [...axis];
     }
     
-    console.log('🔄 Rotation:', { angle: angle.toFixed(2), axis: axis.map(v => v.toFixed(2)) });
-    console.log('📊 Total rotation:', { 
-      angle: this.totalRotation.angle.toFixed(2), 
-      axis: this.totalRotation.axis.map(v => v.toFixed(2)) 
-    });
-    
     // Update the parametric code with the accumulated rotation
     this.updateCodeWithRotation();
   }
@@ -170,84 +154,15 @@ export class TransformManager {
   updateCodeWithTransform() {
     // Try selection-aware code modification first
     if (this.hasValidSelectionContext()) {
-      console.log('🎯 Using selection-aware modification for:', this.selectedObjectName);
-      const success = this.codeUpdater.updateSelectedObjectTransform(
+      this.codeUpdater.updateSelectedObjectTransform(
         this.selectedObjectName,
         this.selectedObjectPath,
         'translate',
         [this.totalDisplacement.x, this.totalDisplacement.y, this.totalDisplacement.z]
       );
-      
-      if (success) {
-        // Get the updated code and trigger a rebuild
-        const currentCode = this.store.code.current;
-        this.codeUpdater.triggerRebuild(currentCode);
-        
-        // === MESH RESET LOGGING ===
-        console.log('=== MESH RESET PROCESS (Selection-aware) ===');
-        if (this.selectedShape) {
-          console.log('--- BEFORE RESET ---');
-          console.log('Mesh position before reset:', this.selectedShape.position.toArray());
-          console.log('Mesh rotation before reset:', this.selectedShape.rotation.toArray());
-          console.log('Mesh scale before reset:', this.selectedShape.scale.toArray());
-          console.log('Mesh matrix before reset:', this.selectedShape.matrix.elements);
-          console.log('Mesh world position before reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
-          
-          // Reset the mesh's transform to avoid double application
-          this.selectedShape.position.set(0, 0, 0);
-          this.selectedShape.rotation.set(0, 0, 0);
-          this.selectedShape.scale.set(1, 1, 1);
-          
-          console.log('--- AFTER RESET ---');
-          console.log('Mesh position after reset:', this.selectedShape.position.toArray());
-          console.log('Mesh rotation after reset:', this.selectedShape.rotation.toArray());
-          console.log('Mesh scale after reset:', this.selectedShape.scale.toArray());
-          console.log('Mesh matrix after reset:', this.selectedShape.matrix.elements);
-          console.log('Mesh world position after reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
-        }
-        // Reset the total displacement tracking after successful update
-        this.totalDisplacement = { x: 0, y: 0, z: 0 };
-        console.log('✅ Selection-aware transform completed');
-        return;
-      } else {
-        console.log('⚠️ Selection-aware modification failed, using fallback');
-      }
-    }
-    
-    // Fallback to original method
-    console.log('🔄 Using fallback code modification method');
-    const success = this.codeUpdater.updateTranslationParams(this.totalDisplacement);
-    
-    if (success) {
-      // Get the updated code and trigger a rebuild
-      const currentCode = this.store.code.current;
-      this.codeUpdater.triggerRebuild(currentCode);
-      
-      // === MESH RESET LOGGING ===
-      console.log('=== MESH RESET PROCESS (Fallback) ===');
-      if (this.selectedShape) {
-        console.log('--- BEFORE RESET ---');
-        console.log('Mesh position before reset:', this.selectedShape.position.toArray());
-        console.log('Mesh rotation before reset:', this.selectedShape.rotation.toArray());
-        console.log('Mesh scale before reset:', this.selectedShape.scale.toArray());
-        console.log('Mesh matrix before reset:', this.selectedShape.matrix.elements);
-        console.log('Mesh world position before reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
-        
-        // Reset the mesh's transform to avoid double application
-        this.selectedShape.position.set(0, 0, 0);
-        this.selectedShape.rotation.set(0, 0, 0);
-        this.selectedShape.scale.set(1, 1, 1);
-        
-        console.log('--- AFTER RESET ---');
-        console.log('Mesh position after reset:', this.selectedShape.position.toArray());
-        console.log('Mesh rotation after reset:', this.selectedShape.rotation.toArray());
-        console.log('Mesh scale after reset:', this.selectedShape.scale.toArray());
-        console.log('Mesh matrix after reset:', this.selectedShape.matrix.elements);
-        console.log('Mesh world position after reset:', this.selectedShape.getWorldPosition(new THREE.Vector3()).toArray());
-      }
-      // Reset the total displacement tracking after successful update
-      this.totalDisplacement = { x: 0, y: 0, z: 0 };
-      console.log('✅ Transform completed, mesh will be recreated');
+    } else {
+      // Fallback to original method
+      this.codeUpdater.updateTranslationParams(this.totalDisplacement);
     }
   }
 
@@ -257,52 +172,15 @@ export class TransformManager {
   updateCodeWithRotation() {
     // Try selection-aware code modification first
     if (this.hasValidSelectionContext()) {
-      console.log('🎯 Using selection-aware rotation for:', this.selectedObjectName);
-      const success = this.codeUpdater.updateSelectedObjectTransform(
+      this.codeUpdater.updateSelectedObjectTransform(
         this.selectedObjectName,
         this.selectedObjectPath,
         'rotate',
-        [this.totalRotation.angle, [this.totalRotation.axis[0], this.totalRotation.axis[1], this.totalRotation.axis[2]]]
+        [this.totalRotation.angle, this.totalRotation.axis[0], this.totalRotation.axis[1], this.totalRotation.axis[2]]
       );
-      
-      if (success) {
-        // Get the updated code and trigger a rebuild
-        const currentCode = this.store.code.current;
-        this.codeUpdater.triggerRebuild(currentCode);
-        
-        // Reset the mesh's transform to avoid double application
-        if (this.selectedShape) {
-          this.selectedShape.position.set(0, 0, 0);
-          this.selectedShape.rotation.set(0, 0, 0);
-          this.selectedShape.scale.set(1, 1, 1);
-        }
-        // Reset the total rotation tracking after successful update
-        this.totalRotation = { angle: 0, axis: [0, 0, 1] };
-        console.log('✅ Selection-aware rotation completed');
-        return;
-      } else {
-        console.log('⚠️ Selection-aware rotation failed, using fallback');
-      }
-    }
-    
-    // Fallback to original method
-    console.log('🔄 Using fallback rotation method');
-    const success = this.codeUpdater.updateRotationParams(this.totalRotation.angle, this.totalRotation.axis);
-    
-    if (success) {
-      // Get the updated code and trigger a rebuild
-      const currentCode = this.store.code.current;
-      this.codeUpdater.triggerRebuild(currentCode);
-      
-      // Reset the mesh's transform to avoid double application
-      if (this.selectedShape) {
-        this.selectedShape.position.set(0, 0, 0);
-        this.selectedShape.rotation.set(0, 0, 0);
-        this.selectedShape.scale.set(1, 1, 1);
-      }
-      // Reset the total rotation tracking after successful update
-      this.totalRotation = { angle: 0, axis: [0, 0, 1] };
-      console.log('✅ Rotation completed, mesh will be recreated');
+    } else {
+      // Fallback to original method
+      this.codeUpdater.updateRotationParams(this.totalRotation);
     }
   }
 
@@ -380,13 +258,12 @@ export class TransformManager {
   }
 
   /**
-   * Set selection context manually
+   * Set selection context for code modification
    */
   setSelectionContext(selectionContext) {
     this.selectionContext = selectionContext;
     this.selectedObjectName = selectionContext.selectedObjectName;
     this.selectedObjectPath = selectionContext.selectedObjectPath;
-    console.log('🔄 Context set:', this.selectedObjectName || 'none');
   }
 
   /**

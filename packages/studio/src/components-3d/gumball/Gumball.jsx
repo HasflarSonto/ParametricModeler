@@ -35,10 +35,6 @@ const Gumball = ({
   // Track mesh changes and handle recreation
   useEffect(() => {
     if (selectedShape !== lastSelectedShapeRef.current) {
-      console.log('=== Gumball: Selected shape changed ===');
-      console.log('Previous shape:', lastSelectedShapeRef.current);
-      console.log('New shape:', selectedShape);
-      
       lastSelectedShapeRef.current = selectedShape;
       
       // Initialize transform parameters when shape changes
@@ -51,8 +47,6 @@ const Gumball = ({
   // Handle code context synchronization
   useEffect(() => {
     if (context && context !== lastContextRef.current) {
-      console.log('🔄 Context changed');
-      
       lastContextRef.current = context;
       
       // Update mesh selector with code context
@@ -76,14 +70,10 @@ const Gumball = ({
   // Listen for parametric system updates and handle mesh recreation
   useEffect(() => {
     const handleCodeUpdate = () => {
-      console.log('=== Gumball: Code update detected ===');
-      
       // The mesh will be recreated by the parametric system
       // We need to wait for the new mesh to be available
       setTimeout(() => {
         if (meshSelectorRef.current && meshSelectorRef.current.hasPersistentSelection()) {
-          console.log('Gumball: Persistent selection detected, waiting for mesh recreation');
-          
           // The MeshSelector should handle tracking the new mesh
           // and the EditorViewer should restore the selection
         }

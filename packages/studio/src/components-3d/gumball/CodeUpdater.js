@@ -11,19 +11,15 @@ export class CodeUpdater {
    */
   updateTranslationParams(totalDisplacement) {
     try {
-      console.log('=== Starting code update process ===');
       const currentCode = this.store.code.current;
-      console.log('Current code length:', currentCode.length);
       
       // Parse the defaultParams object to find current translation values
       const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]*)}/s);
       if (!defaultParamsMatch) {
-        console.log('No defaultParams found in code');
         return false;
       }
       
       const paramsContent = defaultParamsMatch[1];
-      console.log('Found params content:', paramsContent);
       
       // Extract current translation values
       const xTranslateMatch = paramsContent.match(/x_translate:\s*([0-9.-]+)/);
@@ -34,33 +30,10 @@ export class CodeUpdater {
       const currentY = yTranslateMatch ? parseFloat(yTranslateMatch[1]) : 0;
       const currentZ = zTranslateMatch ? parseFloat(zTranslateMatch[1]) : 0;
       
-      console.log('Current translation values:', { x: currentX, y: currentY, z: currentZ });
-      console.log('Total displacement to add:', totalDisplacement);
-      
-      // Calculate new values by adding the displacement
+      // Calculate new parametric coordinates
       const newX = currentX + totalDisplacement.x;
       const newY = currentY + totalDisplacement.y;
       const newZ = currentZ + totalDisplacement.z;
-      
-      console.log('=== COORDINATE CALCULATION ANALYSIS ===');
-      console.log('Current parametric X:', currentX, '+ Displacement X:', totalDisplacement.x, '= New X:', newX);
-      console.log('Current parametric Y:', currentY, '+ Displacement Y:', totalDisplacement.y, '= New Y:', newY);
-      console.log('Current parametric Z:', currentZ, '+ Displacement Z:', totalDisplacement.z, '= New Z:', newZ);
-      
-      // Check if this will cause double movement
-      const xDiff = Math.abs(newX - totalDisplacement.x);
-      const yDiff = Math.abs(newY - totalDisplacement.y);
-      const zDiff = Math.abs(newZ - totalDisplacement.z);
-      
-      if (xDiff < 0.1 && yDiff < 0.1 && zDiff < 0.1) {
-        console.log('⚠️  WARNING: New parametric coordinates will match mesh position!');
-        console.log('⚠️  This will cause double movement on rebuild!');
-        console.log('⚠️  The issue is: parametric coords should be the TARGET, not the current mesh position!');
-      } else {
-        console.log('✅ New parametric coordinates differ from displacement (expected)');
-      }
-      
-      console.log('New translation values:', { x: newX, y: newY, z: newZ });
       
       // Create new params content with updated values
       let newParamsContent = paramsContent;
@@ -95,23 +68,15 @@ export class CodeUpdater {
         newParamsContent = newParamsContent.replace(/\s*}\s*$/, `,\n    z_translate: ${newZ.toFixed(2)}\n  }`);
       }
       
-      // Replace the defaultParams in the code
-      const newCode = currentCode.replace(
-        /const\s+defaultParams\s*=\s*{([^}]*)}/s,
-        `const defaultParams = {${newParamsContent}}`
-      );
+      // Replace the params section in the code
+      const newCode = currentCode.replace(defaultParamsMatch[0], `const defaultParams = {${newParamsContent}}`);
       
-      console.log('New code length:', newCode.length);
-      console.log('Code changed:', newCode !== currentCode);
-      
-      // Update the code in the store
-      this.store.code.update(newCode, true);
-      
-      console.log(`Updated translation parameters: x=${newX.toFixed(2)}, y=${newY.toFixed(2)}, z=${newZ.toFixed(2)}`);
+      // Update the code and trigger rebuild
+      this.triggerRebuild(newCode);
       
       return true;
     } catch (error) {
-      console.error('Error updating translation parameters:', error);
+      console.error('❌ Error updating translation params:', error);
       return false;
     }
   }
@@ -121,12 +86,10 @@ export class CodeUpdater {
    */
   updateRotationParams(angle, axis, center = null) {
     try {
-      console.log('=== Starting rotation code update process ===');
       const currentCode = this.store.code.current;
       // Parse the defaultParams object to find current rotation values
       const defaultParamsMatch = currentCode.match(/const\s+defaultParams\s*=\s*{([^}]*)}/s);
       if (!defaultParamsMatch) {
-        console.log('No defaultParams found in code');
         return false;
       }
       let paramsContent = defaultParamsMatch[1];
@@ -176,14 +139,12 @@ export class CodeUpdater {
       if (!/\.rotate\(/.test(newCode)) {
         // Check if translate already exists
         if (/\.translate\(/.test(newCode)) {
-          console.log('Found existing translate, adding rotate to chain');
           // Add rotate to existing translate chain
           newCode = newCode.replace(
             /(\.translate\([^)]+\));/,
             `$1.rotate(defaultParams.angle, [defaultParams.x_translate, defaultParams.y_translate, defaultParams.z_translate], [defaultParams.axis_x, defaultParams.axis_y, defaultParams.axis_z]);`
           );
         } else {
-          console.log('No translate found, adding both translate and rotate');
           // Add both translate and rotate
           newCode = newCode.replace(
             /(return\s+)([^;]+);/,
@@ -191,32 +152,24 @@ export class CodeUpdater {
           );
         }
       } else {
-        console.log('Found existing rotate, updating it');
         // Update existing rotation call to use translation parameters as center
         newCode = this.updateExistingRotationCenter(newCode);
       }
-      
-      // Debug: Log the generated code
-      console.log('Generated code:', newCode);
-      console.log('Code length:', newCode.length);
       
       // Check for syntax issues
       try {
         // Try to parse the code to catch syntax errors
         new Function(newCode);
-        console.log('Code syntax is valid');
       } catch (syntaxError) {
-        console.error('SYNTAX ERROR in generated code:', syntaxError.message);
-        console.error('Problematic code:', newCode);
+        console.error('❌ Syntax error in generated code:', syntaxError.message);
         return false;
       }
       
       // Update the code in the store
       this.store.code.update(newCode, true);
-      console.log('Updated rotation parameters:', { angle: newAngle, axis: [ax, ay, az] });
       return true;
     } catch (error) {
-      console.error('Error updating rotation parameters:', error);
+      console.error('❌ Error updating rotation parameters:', error);
       return false;
     }
   }
@@ -226,24 +179,15 @@ export class CodeUpdater {
    */
   updateExistingRotationCenter(code) {
     try {
-      console.log('Updating existing rotation call...');
-      console.log('Original code snippet:', code.match(/return[^;]+;/) ? code.match(/return[^;]+;/)[0] : 'No return statement found');
-      
       // Replace rotation calls that use center_x, center_y, center_z with x_translate, y_translate, z_translate
       const updatedCode = code.replace(
         /\.rotate\([^)]+\)/g,
         '.rotate(defaultParams.angle, [defaultParams.x_translate, defaultParams.y_translate, defaultParams.z_translate], [defaultParams.axis_x, defaultParams.axis_y, defaultParams.axis_z])'
       );
       
-      console.log('Updated code snippet:', updatedCode.match(/return[^;]+;/) ? updatedCode.match(/return[^;]+;/)[0] : 'No return statement found');
-      
-      if (updatedCode !== code) {
-        console.log('Updated existing rotation call to use translation parameters as center');
-      }
-      
       return updatedCode;
     } catch (error) {
-      console.error('Error updating existing rotation center:', error);
+      console.error('❌ Error updating existing rotation center:', error);
       return code;
     }
   }
@@ -253,7 +197,6 @@ export class CodeUpdater {
    */
   addTransformParametersToCode() {
     try {
-      console.log('=== Adding transform parameters to code ===');
       const currentCode = this.store.code.current;
       
       // Check if defaultParams already exists (including empty ones)
@@ -318,10 +261,7 @@ export class CodeUpdater {
             /const\s+defaultParams\s*=\s*{([^}]*)}/s,
             `const defaultParams = {${paramsContent}}`
           );
-          console.log('Adding transform parameters to existing defaultParams');
           this.store.code.update(newCode, true);
-        } else {
-          console.log('Transform parameters already exist in defaultParams');
         }
       } else {
         // No defaultParams exists, create it
@@ -329,14 +269,13 @@ export class CodeUpdater {
           /(const main = \([^)]*\) => {)/,
           `const defaultParams = {\n  x_translate: 0,\n  y_translate: 0,\n  z_translate: 0,\n  angle: 0,\n  axis_x: 0,\n  axis_y: 0,\n  axis_z: 1,\n};\n\n$1`
         );
-        console.log('Creating new defaultParams with transform parameters');
         this.store.code.update(newCode, true);
       }
       
       // Also need to modify the main function to use these parameters
       this.addTransformToMainFunction();
     } catch (error) {
-      console.error('Error adding transform parameters:', error);
+      console.error('❌ Error adding transform parameters:', error);
     }
   }
 
@@ -345,7 +284,6 @@ export class CodeUpdater {
    */
   addTransformToMainFunction() {
     try {
-      console.log('=== Adding transform to main function ===');
       const currentCode = this.store.code.current;
       // Check if the main function already has a transform
       const hasTranslate = /\.translate\(\[.*\]\)/.test(currentCode);
@@ -373,13 +311,9 @@ export class CodeUpdater {
       }
       
       if (newCode !== currentCode) {
-        console.log('Adding transform to main function');
-        console.log('Generated code snippet:', newCode.match(/return[^;]+;/) ? newCode.match(/return[^;]+;/)[0] : 'No return statement found');
-        
         // Check for syntax errors before updating
         try {
           new Function(newCode);
-          console.log('Code syntax is valid');
           this.store.code.update(newCode, true);
           this.store.updateCode(newCode);
           // Trigger a rebuild with the new parameters
@@ -395,13 +329,12 @@ export class CodeUpdater {
             });
           }, 100);
         } catch (syntaxError) {
-          console.error('SYNTAX ERROR in generated code:', syntaxError.message);
-          console.error('Problematic code:', newCode);
+          console.error('❌ Syntax error in generated code:', syntaxError.message);
           return false;
         }
       }
     } catch (error) {
-      console.error('Error adding transform to main function:', error);
+      console.error('❌ Error adding transform to main function:', error);
     }
   }
 
@@ -431,11 +364,9 @@ export class CodeUpdater {
       // Trigger a rebuild with the updated parameters after a short delay
       setTimeout(() => {
         if (Object.keys(updatedParams).length > 0) {
-          console.log('🔄 Triggering rebuild with parameters:', Object.keys(updatedParams).length, 'params');
           this.store.process(updatedParams);
         } else {
           // If no parameters found, just trigger a general rebuild
-          console.log('🔄 Triggering general rebuild');
           this.store.process();
         }
       }, 100);
@@ -445,8 +376,6 @@ export class CodeUpdater {
         detail: { code: newCode, source: 'gumball' }
       });
       window.dispatchEvent(codeUpdateEvent);
-      
-      console.log('✅ Rebuild triggered successfully');
       
     } catch (error) {
       console.error('❌ Error during reload process:', error);
@@ -695,12 +624,9 @@ export class CodeUpdater {
     try {
       // Try to parse the modified code
       new Function(modifiedCode);
-      console.log('Code modification validation passed');
       return true;
     } catch (error) {
-      console.error('Code modification validation failed:', error.message);
-      console.error('Original code length:', originalCode.length);
-      console.error('Modified code length:', modifiedCode.length);
+      console.error('❌ Code modification validation failed:', error.message);
       return false;
     }
   }

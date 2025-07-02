@@ -214,14 +214,8 @@ export class CodeAnalyzer {
    */
   determineSelectedObject(analysis, shapeGeometryRef, faceSelected, edgeSelected) {
     if (!analysis || !analysis.returnStatements.length) {
-      console.log('🔍 No return statements found in analysis');
       return null;
     }
-
-    console.log('🔍 Analyzing return statements:', analysis.returnStatements.length);
-    analysis.returnStatements.forEach((ret, index) => {
-      console.log(`  Return ${index + 1}:`, ret);
-    });
 
     // For now, we'll use a simple heuristic:
     // 1. If there's only one return statement, use that
@@ -232,58 +226,46 @@ export class CodeAnalyzer {
     
     if (returns.length === 1) {
       const returnStmt = returns[0];
-      console.log('🔍 Single return statement found:', returnStmt);
       
       if (returnStmt.type === 'simple') {
-        console.log('🎯 Selected simple variable:', returnStmt.details.variable);
         return returnStmt.details.variable;
       } else if (returnStmt.type === 'complex') {
         // Find the 'shape' property
         const shapeProp = returnStmt.details.properties.find(p => p.key === 'shape');
         if (shapeProp) {
-          console.log('🎯 Selected shape property:', shapeProp.value);
           return shapeProp.value;
         }
         // Fallback to first property
         if (returnStmt.details.properties.length > 0) {
-          console.log('🎯 Selected first property:', returnStmt.details.properties[0].value);
           return returnStmt.details.properties[0].value;
         }
       } else if (returnStmt.type === 'chain') {
         // Extract base variable from transformed chain
-        console.log('🎯 Selected base variable from chain:', returnStmt.details.baseVariable);
         return returnStmt.details.baseVariable;
       }
     } else {
       // Multiple return statements - look for one with 'shape' property
-      console.log('🔍 Multiple return statements, looking for shape property');
       for (const returnStmt of returns) {
         if (returnStmt.type === 'complex') {
           const shapeProp = returnStmt.details.properties.find(p => p.key === 'shape');
           if (shapeProp) {
-            console.log('🎯 Selected shape property from complex return:', shapeProp.value);
             return shapeProp.value;
           }
         } else if (returnStmt.type === 'chain') {
           // For chains, use the base variable
-          console.log('🎯 Selected base variable from chain:', returnStmt.details.baseVariable);
           return returnStmt.details.baseVariable;
         }
       }
       
       // Fallback to first return statement
       const firstReturn = returns[0];
-      console.log('🔍 Falling back to first return statement:', firstReturn);
       if (firstReturn.type === 'simple') {
-        console.log('🎯 Selected first simple variable:', firstReturn.details.variable);
         return firstReturn.details.variable;
       } else if (firstReturn.type === 'chain') {
-        console.log('🎯 Selected first base variable from chain:', firstReturn.details.baseVariable);
         return firstReturn.details.baseVariable;
       }
     }
     
-    console.log('❌ No suitable object found');
     return null;
   }
 
@@ -296,17 +278,13 @@ export class CodeAnalyzer {
     }
 
     const paths = analysis.objectPaths;
-    console.log('🔍 Looking for object path for:', selectedObjectName);
-    console.log('🔍 Available paths:', paths);
     
     // Find the path that contains our selected object
     const path = paths.find(p => p.variable === selectedObjectName);
     
     if (path) {
-      console.log('🎯 Found object path:', path.path);
       return path.path;
     } else {
-      console.log('🎯 No object path found (simple return)');
       return null;
     }
   }

@@ -31,7 +31,6 @@ const GumballCore = ({
     if (selectedShape !== selectedShapeRef.current) {
       selectedShapeRef.current = selectedShape;
       shapeKeyRef.current += 1; // Force re-render of TransformControls
-      console.log('Selected shape changed, resetting gumball:', selectedShape);
     }
   }, [selectedShape]);
 
@@ -41,7 +40,6 @@ const GumballCore = ({
       const timer = setTimeout(() => {
         if (controlsRef.current && selectedShape) {
           controlsRef.current.reset();
-          console.log('TransformControls reset to follow object position');
         }
       }, 100);
       
